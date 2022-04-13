@@ -1,3 +1,6 @@
+# Prepping Spatial data for dashboard
+# sqidat is used in older version of Shiny Dashboard, will be replaced with sqidat_fordash populated in sqi_dat_prep.R
+
 library(dplyr)
 library(tidyr)
 library(sf)
@@ -62,7 +65,7 @@ save(cntys, file = 'data/cntys.RData', compress = 'xz')
 save(sheds, file = 'data/sheds.RData', compress = 'xz')
 save(rwqbs, file = 'data/rwqbs.RData', compress = 'xz')
 save(cnstr, file = 'data/cnstr.RData', compress = 'xz')
-save(sqidat, file = 'data/sqidat.RData', compress = 'xz')
+# save(sqidat, file = 'data/sqidat.RData', compress = 'xz')
 
 # stream polylines --------------------------------------------------------
 
