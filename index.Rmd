@@ -41,13 +41,13 @@ downloadButtonRmd <- function (outputId, label = "Download", class = NULL, ...) 
 
 # source functions and data
 source(here('R', 'funcs.R'))
-# data(sqidat)
+# data(sqidat) #this is sqi data from previous version of app
 data(sheds)
 data(cntys)
 data(rwqbs)
 data(cnstr)
 
-# testing new data
+# using new SQI data, generated in R/sqi_dat_prep.R
 data(sqidat_fordash)
 sqidat <- sqidat_fordash
 
