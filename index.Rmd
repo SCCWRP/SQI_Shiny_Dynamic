@@ -1,5 +1,5 @@
 ---
-title: "SQI dashboard"
+title: "SQI dashboard v2"
 output: 
   flexdashboard::flex_dashboard:
     includes:
@@ -47,8 +47,10 @@ data(cntys)
 data(rwqbs)
 data(cnstr)
 
-# using new SQI data, generated in R/sqi_dat_prep.R
-data(sqidat_fordash)
+# run dynamic data creation script
+# this creates 'sqidat_fordash' dataset
+source(here('R', 'sqi_dat_prep.R'))
+# rename to sqidat to simplify
 sqidat <- sqidat_fordash
 
 # numeric variable names
@@ -807,7 +809,9 @@ Column {data-width=500}
 <img src="www/logos.png" width="300">
 <br>
 
-This interactive web page will allow you to explore SQI scores for stream sampling sites from the Stormwater Monitoring Coalition (SMC) Data Portal.  Start by selecting a site by clicking a location on the map to the left.  Scroll through the SQI **Scores**, score **Details**, and **Relative details** for the selected site using the menu selections on the top. 
+This interactive web page will allow you to explore SQI scores for stream sampling sites from the Stormwater Monitoring Coalition (SMC) Data Portal.  Start by selecting a site by clicking a location on the map to the left.  Scroll through the SQI **Scores**, score **Details**, and **Relative details** for the selected site using the menu selections on the top.
+
+This "dynamic" version of the SQI dashboard shows results for the most recent data that has been submitted to the SMC data portal. For the previous, static version, visit [here](https://sccwrp.shinyapps.io/sqi_shiny/).
 
 Please visit [here](https://sccwrp.shinyapps.io/SQI_Shiny/sqi_calc.Rmd) to calculate your own SQI scores.
 

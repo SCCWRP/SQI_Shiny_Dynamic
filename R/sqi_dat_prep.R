@@ -1,4 +1,6 @@
 # Script pulling the SQI dataset from the SMC and reformatting it to align with Shiny dashboard script
+# This is what makes the dataset "Dynamic"
+
 # by Annie Holt 4/13/2022
 # Generally have to prep/rename columns and clean dataset a bit 
 # Then run through SQI function to calculate
@@ -17,19 +19,20 @@ library(tidyverse)
 library(sf)
 library(SQI)
 
-# Import new data
-# this dataset is created as a database View in SCCWRP's SMC database
-# to change the dataset and this checker location, need to edit the SQL query in the View
+# Import new/dynamic data
+# this dataset is created as a database View in SCCWRP's SMC database (vw_sqi_dat)
+# to change the dataset/how it is assembled, need to edit the View ... though some changes can be made below as well if don't need to restructure
 # should be in-house accessible only
 sqi_raw <- read_csv("https://smcchecker.sccwrp.org/smc/sqi_rawdata")
 
-# load underlying shapefiles
-data(sheds)
-data(cntys)
-data(rwqbs)
-data(cnstr)
-# old data for reference
-data("sqidat")
+# # load underlying shapefiles
+# # do this in app instead
+# data(sheds)
+# data(cntys)
+# data(rwqbs)
+# data(cnstr)
+# # old data for reference
+# # data("sqidat")
 
 sqidat_fordash <- sqi_raw %>% 
   # column renaming to match with names in index.Rmd
@@ -45,7 +48,7 @@ sqidat_fordash <- sqi_raw %>%
          ps = cram_physicalstructure, hy = cram_hydrology, blc = cram_bufferandladscapecontext, bs = cram_bioticstructure,
          # biostim analytes
          Cond = cond, TN = total_n_all, TP = total_p_all) %>% 
-  # assingn levels to stream class
+  # assign levels to stream class
   mutate(strcls  = factor(strcls, levels = c("likely unconstrained", "possibly unconstrained", "possibly constrained",
                                              "likely constrained"))) %>% 
   
