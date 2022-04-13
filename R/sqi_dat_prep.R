@@ -31,7 +31,6 @@ data(cnstr)
 # old data for reference
 data("sqidat")
 
-
 sqidat_fordash <- sqi_raw %>% 
   # column renaming to match with names in index.Rmd
   rename(MasterID = masterid, COMID = comid, 
@@ -73,11 +72,8 @@ sqidat_fordash <- sqi_raw %>%
   sqi()
   
 
-
 # export
 save(sqidat_fordash, file = 'data/sqidat_fordash.RData', compress = 'xz')
 
 
-data("sqidat")
-data("sqidat_fordash")
 
