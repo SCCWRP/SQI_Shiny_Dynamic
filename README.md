@@ -1,6 +1,6 @@
 # README
 
-Materials for new version of water quality index shiny app, updated 04/12/2022: []
+Materials for new version of water quality index shiny app, updated 04/12/2022: [https://sccwrp.shinyapps.io/sqi_shiny_dynamic](https://sccwrp.shinyapps.io/sqi_shiny_dynamic/)
 
 Older version of water quality index shiny app: [https://sccwrp.shinyapps.io/SQI_Shiny](https://sccwrp.shinyapps.io/SQI_Shiny)
 

@@ -76,7 +76,16 @@ sqidat_fordash <- sqi_raw %>%
   
 
 # export
-save(sqidat_fordash, file = 'data/sqidat_fordash.RData', compress = 'xz')
+# save(sqidat_fordash, file = 'data/sqidat_fordash.RData', compress = 'xz')
 
 
+# exploring differences between new dataset and previous version (data/sqidat.RData)
+
+# 
+# dat_explore <- sqidat_fordash %>%
+#   select(MasterID, yr, csci_sampledate, CSCI) %>%
+#   rename(csci_sampledate_new = csci_sampledate, CSCI_new = CSCI) %>%
+#   full_join(sqidat %>% as.data.frame() %>% select(MasterID, yr, CSCI)) 
+# 
+# write_csv(dat_explore, "C:/Downloads/sqi_explore.csv")
 
