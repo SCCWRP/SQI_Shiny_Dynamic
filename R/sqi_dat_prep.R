@@ -23,7 +23,7 @@ library(SQI)
 # this dataset is created as a database View in SCCWRP's SMC database (vw_sqi_dat)
 # to change the dataset/how it is assembled, need to edit the View ... though some changes can be made below as well if don't need to restructure
 # should be in-house accessible only
-sqi_raw <- read_csv("https://nexus.sccwrp.org/smcdata/sqi")
+sqi_raw <- read_csv("https://smcchecker.sccwrp.org/smc/sqi_rawdata")
 
 # # load underlying shapefiles
 # # do this in app instead
