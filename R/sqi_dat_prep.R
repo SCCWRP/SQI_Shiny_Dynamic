@@ -72,9 +72,9 @@ sqidat_fordash <- sqi_raw %>%
   distinct(MasterID, yr, .keep_all = TRUE) %>% 
   
   # now run through SQI function to calculate various SQI metrics
+
   sqi()
   
-
 # export
 # save(sqidat_fordash, file = 'data/sqidat_fordash.RData', compress = 'xz')
 
