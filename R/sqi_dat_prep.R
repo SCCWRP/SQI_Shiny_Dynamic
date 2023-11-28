@@ -42,7 +42,7 @@ sqidat_fordash <- sqi_raw %>%
          # stream class, scape categories
          strcls = ref10, lower = qt10, meds = qt50, upper = qt90,
          # phab metrics
-         Ev_FlowHab = ev_flowhab, H_AqHab = h_aqhab,H_SubNat = h_subnat, PCT_SAFN = pct_safn, XCMG = xcmg,
+         Ev_FlowHab = ev_flowhab, H_AqHab = h_aqhab,H_SubNat = h_subnat, PCT_SAFN = pct_safn_score, XCMG = xcmg,
          # cram score and metrics
          indexscore_cram = cram_score,
          ps = cram_physicalstructure, hy = cram_hydrology, blc = cram_bufferandladscapecontext, bs = cram_bioticstructure,

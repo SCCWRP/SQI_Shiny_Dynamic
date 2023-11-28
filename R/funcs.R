@@ -298,7 +298,7 @@ formdl_fun <- function(dat){
       CRAM = indexscore_cram
     ) %>% 
     #dplyr::select(-CSCI_rc, -ASCI_rc, -Bio_BPJ, -bio_fp, -SiteSet, -WaterChemistryCondition, -HabitatCondition, -OverallStressCondition, -lower, -meds, -upper) %>% 
-    dplyr::select(-bio_fp, -SiteSet, -WaterChemistryCondition, -HabitatCondition, -OverallStressCondition, -lower, -meds, -upper) %>% 
+    #dplyr::select(-SiteSet, -WaterChemistryCondition, -HabitatCondition, -OverallStressCondition, -lower, -meds, -upper) %>% 
     dplyr::mutate(
       lon = st_coordinates(.)[, 1], 
       lat = st_coordinates(.)[, 2]
