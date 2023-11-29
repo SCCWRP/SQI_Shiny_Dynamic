@@ -35,25 +35,27 @@ sqi_raw <- read_csv("https://nexus.sccwrp.org/smcchecker/sqi_rawdata")
 # # data("sqidat")
 
 sqidat_fordash <- sqi_raw %>% 
-  # column renaming to match with names in index.Rmd
+  # column renaming to match with names in index.Rmd 
   rename(MasterID = masterid, COMID = comid, 
          
          yr = year, ASCI = d_asci_max, CSCI = csci_max, IPI = ipi,
          # stream class, scape categories
          strcls = ref10, lower = qt10, meds = qt50, upper = qt90,
          # phab metrics
-         Ev_FlowHab = ev_flowhab, H_AqHab = h_aqhab,H_SubNat = h_subnat, PCT_SAFN = pct_safn_score, XCMG = xcmg,
+         Ev_FlowHab = ev_flowhab_score, H_AqHab = h_aqhab_score,H_SubNat = h_subnat_score, PCT_SAFN = pct_safn_score, XCMG = xcmg_score,
          # cram score and metrics
          indexscore_cram = cram_score,
          ps = cram_physicalstructure, hy = cram_hydrology, blc = cram_bufferandladscapecontext, bs = cram_bioticstructure,
          # biostim analytes
          Cond = cond, TN = total_n_all, TP = total_p_all) %>% 
+  mutate(Ev_FlowHab_raw = ev_flowhab, H_AqHab_raw = h_aqhab,H_SubNat_raw = h_subnat, PCT_SAFN_raw = pct_safn, XCMG_raw = xcmg) %>%
   # assign levels to stream class
   mutate(strcls  = factor(strcls, levels = c("likely unconstrained", "possibly unconstrained", "possibly constrained",
                                              "likely constrained"))) %>% 
   
   # final columns needed for Shiny
-  select(MasterID, COMID, latitude, longitude, yr, csci_sampledate, ASCI, CSCI, IPI, Ev_FlowHab, H_AqHab, H_SubNat, PCT_SAFN, XCMG,
+  select(MasterID, COMID, latitude, longitude, yr, csci_sampledate, ASCI, CSCI, IPI, Ev_FlowHab, Ev_FlowHab_raw, H_AqHab, H_AqHab_raw, 
+         H_SubNat, H_SubNat_raw,  PCT_SAFN, PCT_SAFN_raw,  XCMG, XCMG_raw,
          indexscore_cram, ps, hy, blc, bs, Cond, TN, TP, strcls, lower, meds, upper) %>% 
   
   # only keep data that has complete data across below metrics (No NAs) 

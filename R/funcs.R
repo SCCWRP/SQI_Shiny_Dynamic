@@ -298,7 +298,7 @@ formdl_fun <- function(dat){
       CRAM = indexscore_cram
     ) %>% 
     #dplyr::select(-CSCI_rc, -ASCI_rc, -Bio_BPJ, -bio_fp, -SiteSet, -WaterChemistryCondition, -HabitatCondition, -OverallStressCondition, -lower, -meds, -upper) %>% 
-    #dplyr::select(-SiteSet, -WaterChemistryCondition, -HabitatCondition, -OverallStressCondition, -lower, -meds, -upper) %>% 
+    dplyr::select(-WaterChemistryCondition, -HabitatCondition, -OverallStressCondition) %>% 
     dplyr::mutate(
       lon = st_coordinates(.)[, 1], 
       lat = st_coordinates(.)[, 2]
@@ -324,6 +324,34 @@ formdl_fun <- function(dat){
   # join ecdf with out
   out <- out %>%
     full_join(ecdf_tojn, by = c('MasterID', 'yr'))
+  
+  # Function to reorder columns
+  reorder_columns <- function(df) {
+    cols <- names(df)
+    raw_cols <- cols[grepl("_raw$", cols)]
+    other_cols <- cols[!cols %in% raw_cols]
+    
+    new_order <- c()
+    for (col in other_cols) {
+      new_order <- c(new_order, col)
+      raw_col <- paste0(col, "_raw")
+      if (raw_col %in% raw_cols) {
+        new_order <- c(new_order, raw_col)
+      }
+    }
+    df[new_order]
+  }
+  
+  
+  # Apply the function to your dataframe
+  out <- reorder_columns(out) %>%
+    rename(
+      Ev_FlowHab_score = Ev_FlowHab, 
+      H_AqHab_score = H_AqHab,
+      H_SubNat_score = H_SubNat, 
+      PCT_SAFN_score = PCT_SAFN, 
+      XCMG_score = XCMG
+    )
   
   return(out)
   

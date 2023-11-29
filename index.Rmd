@@ -1094,7 +1094,7 @@ Column {data-width=500}
 
 ### Glossary of terms
 
-Below is a glossary of terms used in the SQI.  Please see the overview tab for a general description of the foundation and main components of the SQI. Labels `like this` describe column names in the spreadsheet that can be downloaded from the overview tab.  Note that variables in the downloaded data with the `_ptile` suffix indicate the percentile value of the variable at a site relative to all other sites in the file.
+Below is a glossary of terms used in the SQI. Please see the overview tab for a general description of the foundation and main components of the SQI. Labels `like this` describe column names in the spreadsheet that can be downloaded from the overview tab. Note that variables in the downloaded data with the `_ptile` suffix indicate the percentile value of the variable at a site relative to all other sites in the file. Physical habitat metrics with the `_raw` suffix are raw metric values, whereas those with the`_score` suffix indicate scored values (where 0 indicates degraded conditions and 1 indicates intact conditions).
 
 __% sands and fines__, `PCT_SAFN`: One of five IPI metrics, measures the amount of small-grained sediment particles (i.e., < 2 mm) that have accumulated in the stream bottom as a result of deposition.  Also includes concrete. Scores closer to zero indicate more degraded conditions and scores closer to 1 indicate more natural conditions (i.e., lower percent sands and fines).
 
@@ -1146,4 +1146,8 @@ __Total nitrogen__, `TN`: The concentration (mg/L) of total nitrogen from a wate
 
 __Total phosphorus__, `TP`: The concentration (mg/L) of total phosphorus from a water sample at a site at baseflow conditions. High concentrations of nutrients like TP are associated with eutrophic conditions.
 
-__Year__, `yr`: The year in which sampling occurred for all indicators used in the SQI assessment at a site.
+__Lower range of likely scores__, `lower`: The *10th* percentile of predicted scores, given the level of development in the watershed. See Beck et al. (2019; [https://doi.org/10.1086/705996](https://doi.org/10.1086/705996)).
+
+__Median likely score__, `meds`: The *50th* percentile of predicted scores, given the level of development in the watershed. See Beck et al. (2019; [https://doi.org/10.1086/705996](https://doi.org/10.1086/705996)).
+
+__Upper range of likely scores__, `upper`: The *90th* percentile of predicted scores, given the level of development in the watershed. See Beck et al. (2019; [https://doi.org/10.1086/705996](https://doi.org/10.1086/705996)).
