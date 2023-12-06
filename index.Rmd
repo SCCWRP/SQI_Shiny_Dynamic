@@ -1,5 +1,5 @@
 ---
-title: "SQI dashboard v2"
+title: "SQI dashboard v2.01"
 output:
   flexdashboard::flex_dashboard:
     includes:
@@ -46,7 +46,9 @@ library(shinycssloaders)
 library(RColorBrewer)
 library(shinydashboard)
 library(glue)
-
+library(gridExtra)
+library(grid)
+library(openxlsx)
 
 downloadButtonRmd <- function (outputId, label = "Download", class = NULL, ...)  {
   tags$a(id = outputId, class = paste("btn btn-default shiny-download-link", 
@@ -486,9 +488,7 @@ observeEvent(input$map_marker_click, {
       fillOpacity = 1,
       label = ~paste0(MasterID, ' (', yr, '): ', toshw)
     )
-  
-  print("map")  
-  print(map)
+
   
   
 })
@@ -746,7 +746,165 @@ output$dltab <- downloadHandler(
     
   }
 )
+
+# function to generate PDF content
+generate_pdf_report <- function(file) {
+  
+    # data
+    tmp_dat <- sitedat() %>% rename(
+      biological_condition = BiologicalCondition,
+      stress_condition = OverallStressCondition_detail,
+      SQI = StreamHealthIndex
+    )
+
+    # Summary Section
+    filtered_by <- input$flby
+    selected_filters <- paste(input$flts, collapse = ", ")
+
+    unique_sites_num <- length(unique(tmp_dat$MasterID))
+    unique_sample_num <- nrow(tmp_dat)
+    
+    initial_year <- min(tmp_dat$yr)
+    final_year <- max(tmp_dat$yr)
+    
+    # Help func
+    get_category_count <- function(data, groupby_col, category_name) {
+
+      groupby_col <- rlang::sym(groupby_col)
+      summary_data <- data %>%
+        group_by(!!groupby_col) %>%
+        summarise(
+          distinct_count = n_distinct(MasterID), 
+          row_count = n()
+        )
+
+      
+      category_counts <- summary_data %>%
+        filter(!!groupby_col == category_name) %>%
+        summarise(
+          distinct_count = first(distinct_count),
+          row_count = first(row_count)
+        ) %>%
+        mutate(
+          distinct_count = ifelse(is.na(distinct_count), 0, distinct_count),
+          row_count = ifelse(is.na(row_count), 0, row_count)
+        )
+      
+      
+      # Handling cases where the specified category might not exist
+      if (nrow(category_counts) == 0) {
+        return(list(raw_site_count = 0, raw_sample_count = 0, pct_site_count = 0, pct_sample_count = 0))
+      } else {
+        return(list(
+          raw_site_count = category_counts$distinct_count,
+          raw_sample_count = category_counts$row_count,
+          pct_site_count = round((category_counts$distinct_count / length(unique(data$MasterID))) * 100 , 1),
+          pct_sample_count = round((category_counts$row_count  / nrow(data)) * 100, 1)
+        ))
+      }
+    }
+    
+    # Duy: 1,2,3,etc. is the order of the category in the word file that Rafi sent
+    # Overall condition section
+    overall_1_count <- get_category_count(tmp_dat, 'SQI', 'Healthy and unstressed')
+    overall_2_count <- get_category_count(tmp_dat, 'SQI', 'Healthy and resilient')
+    overall_3_count <- get_category_count(tmp_dat, 'SQI', 'Impacted and stressed')
+    overall_4_count <- get_category_count(tmp_dat, 'SQI', 'Impacted by unknown stress')
+    
+    
+    # Biological condition section
+    biological_1_count <- get_category_count(tmp_dat, 'biological_condition', 'Healthy')
+    biological_2_count <- get_category_count(tmp_dat, 'biological_condition', 'Impacted for ASCI')
+    biological_3_count <- get_category_count(tmp_dat, 'biological_condition', 'Impacted for CSCI')
+    biological_4_count <- get_category_count(tmp_dat, 'biological_condition', 'Impacted for CSCI and ASCI')
+
+    # Stress condition section
+    stress_1_count <- get_category_count(tmp_dat, 'stress_condition', "Low stress")
+    stress_2_count <- get_category_count(tmp_dat, 'stress_condition', "Stressed by chemistry degradation")
+    stress_3_count <- get_category_count(tmp_dat, 'stress_condition', "Stressed by habitat degradation")
+    stress_4_count <- get_category_count(tmp_dat, 'stress_condition', "Stressed by chemistry and habitat degradation")
+    stress_5_count <- get_category_count(tmp_dat, 'stress_condition', "Stressed by low levels of chemistry or habitat degradation")
+    
+    
+    # Begin making PDFs
+    pdf(file, width = 10, height = 12)
+
+    # Start the page
+    plot.new()
+    
+    # Set the left margin for the text
+    left_margin <- 0
+    
+    # Wrap the selected_filters text to fit within a certain width
+    wrapped_text <- strwrap(selected_filters, width = 80)  # Adjust the width as needed
+
+    
+    # Title and introduction
+    text(left_margin, 0.95, "Summary Report", adj = 0, cex = 1.5)
+    text(left_margin, 0.90, paste0("Stream quality in selected ", filtered_by, ": "), adj = 0, cex = 0.8)
+    # Display each line of the wrapped text
+    y_pos_start <- 0.85
+    line_height <- 0.02  # Adjust the line height as needed
+    for (line in wrapped_text) {
+        text(left_margin, y_pos_start, line, adj = 0, cex = 0.8)
+        y_pos_start <- y_pos_start - line_height
+    }
+    
+    # Calculate the next starting y-position after the wrapped text
+    next_y_pos <- y_pos_start - 0.02  # Additional space before the next section
+    
+    # Subsequent text, starting from the calculated position
+    text(left_margin, next_y_pos, paste(unique_sites_num, "sites and", unique_sample_num, "samples evaluated."), adj = 0, cex = 0.8)
+    next_y_pos <- next_y_pos - line_height
+    text(left_margin, next_y_pos, paste("Data spans from", initial_year, "to", final_year, "."), adj = 0, cex = 0.8)
+    
+    # Overall Condition Section
+    text(left_margin, 0.7, "Overall Condition", adj = 0, cex = 1.2)
+    text(left_margin, 0.65, paste0( overall_1_count$raw_sample_count, " of ", unique_sample_num, " samples (", overall_1_count$pct_sample_count ,"%)", " are healthy and unstressed"), adj = 0, cex = 0.8)
+    text(left_margin, 0.625, paste0( overall_2_count$raw_sample_count, " of ", unique_sample_num, " samples (", overall_2_count$pct_sample_count ,"%)", " are healthy and resilient"), adj = 0, cex = 0.8)
+    text(left_margin, 0.60, paste0( overall_3_count$raw_sample_count, " of ", unique_sample_num, " samples (", overall_3_count$pct_sample_count ,"%)", " are impacted and stressed"), adj = 0, cex = 0.8)
+    text(left_margin, 0.575, paste0( overall_4_count$raw_sample_count, " of ", unique_sample_num, " samples (", overall_4_count$pct_sample_count ,"%)", " impacted by unknown stress"), adj = 0, cex = 0.8)
+    
+    
+    
+    
+    # Biological Condition Section
+    text(left_margin, 0.525, "Biological Condition", adj = 0, cex = 1.2)
+    text(left_margin, 0.500, paste0(biological_1_count$raw_sample_count, " of ", unique_sample_num, " samples (", biological_1_count$pct_sample_count ,"%)", " are healthy"), adj = 0, cex = 0.8)
+    text(left_margin, 0.475, paste0(biological_2_count$raw_sample_count, " of ", unique_sample_num, " samples (", biological_2_count$pct_sample_count ,"%)", " are impacted for the Algal Stream Condition Index (ASCI)"), adj = 0, cex = 0.8)
+    text(left_margin, 0.450, paste0(biological_3_count$raw_sample_count, " of ", unique_sample_num, " samples (", biological_3_count$pct_sample_count ,"%)", " are impacted for the California Stream Condition Index (CSCI) for benthic macroinvertebrates"), adj = 0, cex = 0.8)
+    text(left_margin, 0.425, paste0(biological_4_count$raw_sample_count, " of ", unique_sample_num, " samples (", biological_4_count$pct_sample_count ,"%)", " are impacted for both the ASCI and CSCI"), adj = 0, cex = 0.8)
+    
+    
+    
+    
+    # Stress Condition Section
+    text(left_margin, 0.375, "Stress Condition", adj = 0, cex = 1.2)
+    text(left_margin, 0.350, paste0( stress_1_count$raw_sample_count, " of ", unique_sample_num, " samples (", stress_1_count$pct_sample_count ,"%)", " have low stress"), adj = 0, cex = 0.8)
+    text(left_margin, 0.325, paste0( stress_2_count$raw_sample_count, " of ", unique_sample_num, " samples (", stress_2_count$pct_sample_count ,"%)", " are stressed degraded water chemistry"), adj = 0, cex = 0.8)
+    text(left_margin, 0.300, paste0( stress_3_count$raw_sample_count, " of ", unique_sample_num, " samples (", stress_3_count$pct_sample_count ,"%)", " are stressed by degraded habitat"), adj = 0, cex = 0.8)
+    text(left_margin, 0.275, paste0( stress_4_count$raw_sample_count, " of ", unique_sample_num, " samples (", stress_4_count$pct_sample_count ,"%)", " are stressed by degraded both water chemistry and habitat"), adj = 0, cex = 0.8)
+    text(left_margin, 0.250, paste0( stress_5_count$raw_sample_count, " of ", unique_sample_num, " samples (", stress_5_count$pct_sample_count ,"%)", " are stressed by low levels of water chemistry and habitat degradation"), adj = 0, cex = 0.8)
+    
+    
+  
+    dev.off()
+    
+}
+
+
+# download handler for data selected by spatial filter
+output$dlreport <- downloadHandler(
+        filename = function() {
+            paste("stream_quality_report-", Sys.Date(), ".pdf", sep="")
+        },
+        content = function(file) {
+            generate_pdf_report(file)
+        }
+)
+
 ```
+
 
 
 Sidebar {.sidebar data-width=700}
@@ -847,6 +1005,13 @@ Please visit [here](https://sccwrp.shinyapps.io/SQI_Shiny/sqi_calc.Rmd) to calcu
 fluidRow(
   column(12, 'Click here to download SQI data from the map:'),
   column(2, downloadButtonRmd('dltab', ''))
+)
+```
+
+```{r}
+fluidRow(
+  column(12, 'Click here to download a summary of selected sites:'),
+  column(2, downloadButtonRmd('dlreport', ''))
 )
 ```
 
