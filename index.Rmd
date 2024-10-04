@@ -683,8 +683,8 @@ output$plodstbio <- renderPlot({
   dstplo <- dstbio()
 
   # patchwork
-  wrap_plots(dstplo$plos, nrow = 1)
-  
+  #wrap_plots(dstplo$plos, nrow = 1)
+  grid.arrange(grobs = dstplo$plos, nrow = 1)
 }, height = 180)
 
 # distribution boxplots, chemistry
@@ -694,8 +694,8 @@ output$plodstchm <- renderPlot({
   dstplo <- dstchm()
 
   # patchwork
-  wrap_plots(dstplo$plos, nrow = 1)
-  
+  #wrap_plots(dstplo$plos, nrow = 1)
+  grid.arrange(grobs = dstplo$plos, nrow = 1)
 }, height = 180)
 
 # distribution boxplots, habitat
@@ -703,10 +703,12 @@ output$plodsthab <- renderPlot({
   
   # input
   dstplo <- dsthab()
-
+  print("look here")
+  print(packageVersion("patchwork"))
+  print(dstplo$plos)
   # patchwork
-  wrap_plots(dstplo$plos, nrow = 1)
-  
+  #wrap_plots(unlist(dstplo), nrow = 1)
+  grid.arrange(grobs = dstplo$plos, nrow = 1)
 }, height = 180)
 
 # distribution boxplots, cram components
@@ -716,8 +718,8 @@ output$plodstcrm <- renderPlot({
   dstplo <- dstcrm()
 
   # patchwork
-  wrap_plots(dstplo$plos, nrow = 1)
-  
+  #wrap_plots(dstplo$plos, nrow = 1)
+  grid.arrange(grobs = dstplo$plos, nrow = 1)
 }, height = 180)
 
 # distribution boxplots,ipi components
@@ -727,8 +729,8 @@ output$plodstipi <- renderPlot({
   dstplo <- dstipi()
 
   # patchwork
-  wrap_plots(dstplo$plos, nrow = 1)
-  
+  #wrap_plots(dstplo$plos, nrow = 1)
+  grid.arrange(grobs = dstplo$plos, nrow = 1)
 }, height = 180)
 
 ##
