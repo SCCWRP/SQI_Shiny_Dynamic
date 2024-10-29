@@ -105,15 +105,16 @@ allcol <- getdsccol(palout = T)
 gauge_col <- c('#a9d70b', '#f9c802', '#ff0000')
 
 # round sqidat variables so gauge colors match relative plot colors
-sqidat <- sqidat %>% 
-  gather('var', 'val', ASCI, blc, bs, Cond, CSCI, Ev_FlowHab, H_AqHab, H_SubNat, hy, indexscore_cram, IPI, PCT_SAFN, ps, TN, TP, XCMG) %>% 
-  mutate(
-    val = case_when(
-      var %in% c('Cond', 'indexscore_cram', 'blc', 'bs', 'hy', 'ps') ~ round(val, 1), 
-      var %in% c('ASCI', 'CSCI', 'Ev_FlowHab', 'H_AqHab', 'H_SubNat', 'IPI', 'PCT_SAFN', 'TN', 'TP', 'XCMG') ~ round(val, 2)
-      )
-    ) %>% 
-  spread(var, val)
+# sqidat <- sqidat %>% 
+#   gather('var', 'val', ASCI, blc, bs, Cond, CSCI, Ev_FlowHab, H_AqHab, H_SubNat, hy, indexscore_cram, IPI, PCT_SAFN, ps, TN, TP, XCMG) %>% 
+#   mutate(
+#     val = case_when(
+#       #var %in% c('Cond', 'indexscore_cram', 'blc', 'bs', 'hy', 'ps') ~ round(val, 1), 
+#       var %in% c('Cond', 'indexscore_cram', 'blc', 'bs', 'hy', 'ps'), 
+#       var %in% c('ASCI', 'CSCI', 'Ev_FlowHab', 'H_AqHab', 'H_SubNat', 'IPI', 'PCT_SAFN', 'TN', 'TP', 'XCMG') ~ round(val, 2)
+#       )
+#     ) %>% 
+#   spread(var, val)
   
 ```
 
@@ -391,61 +392,80 @@ dstipi <- reactive({
 ```{r outputobj}
 
 output$num_displayed_points_on_map <- renderText({
-  num_points_displayed <- length(unique(sitedat()$MasterID))
-  glue("Number of sites displayed: {num_points_displayed}")
-
+  # Separate the data based on the missing values
+  sitedat <- sitedat()
+  complete_data_count <- nrow(sitedat %>% filter(missing_chemistry == 'NO', missing_habitat == 'NO'))
+  missing_data_count <- nrow(sitedat %>% filter(!(missing_chemistry == 'NO' & missing_habitat == 'NO')))
+  
+  # Display both counts
+  glue("Number of sites with completed data: {complete_data_count}\nNumber of sites with missing chemistry or missing habitat: {missing_data_count}")
 })
 
 
 output$map <- renderLeaflet({
-
   # input
   tomap <- input$tomap
   polys <- polys()
   sitedat <- sitedat()
-
+  
   req(nrow(polys) > 0)
   
-  # assign colors
+  # Assign colors
   cols <- getdsccol(sitedat[[tomap]])
   names(cols) <- NULL
   names(sitedat)[names(sitedat) %in% tomap] <- 'toshw'
   
-  # legend stuff
+  # Filter data into two groups
+  sitedat_group1 <- sitedat %>% 
+    filter(missing_chemistry == 'NO', missing_habitat == 'NO')
+  sitedat_group2 <- sitedat %>% 
+    filter(!(missing_chemistry == 'NO' & missing_habitat == 'NO'))
+  
+  # Legend colors
   legcols <- getdsccol(palfac = tomap)
 
-  mapview(polys, fill = F, label = polys$pllb, homebutton = F, popup = NULL, legend = F) %>% 
-    .@map %>% 
-    # removeMouseCoordinates() %>% #this function no longer seems to be available in leaflet
+  # Render the map
+  mapview(polys, fill = F, label = polys$pllb, homebutton = F, popup = NULL, legend = F) %>%
+    .@map %>%
     addCircleMarkers(
-      data = sitedat, 
+      data = sitedat_group1, 
       layerId = ~MasterID,
       stroke = TRUE,
       color = 'black',
       fill = TRUE,
       fillColor = cols,
-      radius=5, 
+      radius = 5, 
       weight = 1,
       fillOpacity = 1,
       label = ~paste0(MasterID, ' (', yr, '): ', toshw)
-    ) %>% 
+    ) %>%
+    addCircleMarkers(
+      data = sitedat_group2, 
+      layerId = ~MasterID,
+      stroke = TRUE,
+      color = 'red',       # Different border color
+      fill = TRUE,
+      fillColor = cols,
+      radius = 7,          # Slightly larger marker
+      weight = 1,
+      fillOpacity = 0.6,   # Slightly transparent fill
+      label = ~paste0(MasterID, ' (', yr, '): ', toshw)
+    ) %>%
     addLegend("bottomleft", colors = legcols$col, labels = legcols$nms, opacity = 1)
-
 })
 
-# leaflet proxy for marker select
+# Leaflet proxy for marker select
 map <- leafletProxy("map")
 
-# binding for marker select and year
+# Binding for marker select and year
 makeReactiveBinding('selsit')
 
-# the selection
+# Selection
 observeEvent(input$map_marker_click, {
   selsit <<- input$map_marker_click$id
 })
 
 observeEvent(input$map_marker_click, {
-
   # inputs
   tomap <- input$tomap
   sitedat <- sitedat()
@@ -455,27 +475,50 @@ observeEvent(input$map_marker_click, {
   names(cols) <- NULL
   names(sitedat)[names(sitedat) %in% tomap] <- 'toshw'
   
-  # filter the pour points by selection
-  selsitplo <- sitedat %>% 
-    filter(MasterID %in% selsit)
+  # Filter groups based on selection to reapply styling
+  sitedat_group1 <- sitedat %>% 
+    filter(missing_chemistry == 'NO', missing_habitat == 'NO')
+  sitedat_group2 <- sitedat %>% 
+    filter(!(missing_chemistry == 'NO' & missing_habitat == 'NO'))
+  
+  # Filter for selected site
+  selsitplo <- sitedat %>% filter(MasterID == selsit)
   selsitplocol <- getdsccol(selsitplo[['toshw']])
   names(selsitplocol) <- NULL
   
-  # clear markers on input select, add all points and selected point
-  map <- map %>% 
-    clearMarkers() %>% 
+  # Clear markers and reapply styles for all markers, including selected one
+  map <- map %>%
+    clearMarkers() %>%
+    
+    # Group 1 markers
     addCircleMarkers(
-      data = sitedat, 
+      data = sitedat_group1, 
       layerId = ~MasterID,
       stroke = TRUE,
       color = 'black',
       fill = TRUE,
       fillColor = cols,
-      radius=5, 
+      radius = 5, 
       weight = 1,
       fillOpacity = 1,
       label = ~paste0(MasterID, ' (', yr, '): ', toshw)
-    ) %>% 
+    ) %>%
+    
+    # Group 2 markers
+    addCircleMarkers(
+      data = sitedat_group2, 
+      layerId = ~MasterID,
+      stroke = TRUE,
+      color = 'red',       # Different border color
+      fill = TRUE,
+      fillColor = cols,
+      radius = 7,          # Slightly larger marker
+      weight = 1,
+      fillOpacity = 0.6,   # Slightly transparent fill
+      label = ~paste0(MasterID, ' (', yr, '): ', toshw)
+    ) %>%
+    
+    # Highlight the selected marker
     addCircleMarkers(
       data = selsitplo, 
       layerId = ~MasterID,
@@ -483,15 +526,14 @@ observeEvent(input$map_marker_click, {
       color = 'black',
       fillColor = selsitplocol,
       fill = TRUE,
-      radius=10, 
+      radius = 10, 
       weight = 6,
       fillOpacity = 1,
       label = ~paste0(MasterID, ' (', yr, '): ', toshw)
     )
-
-  
-  
 })
+
+
 
 ##
 # SQI descriptor outputs
@@ -963,12 +1005,22 @@ column(width = 12,
 
       if(nrow(cats()) > 0){
         
-        # get lat lon       
+        # Get unique years and join them with commas
+        years <- paste(unique(cats()$yr), collapse = ", ")
+        
+        # Get unique COMID (assuming there's only one, or you want to take the first if there are multiple)
+        comid <- unique(cats()$COMID)[1]
+        
+        # Get unique coordinates (assuming they remain the same across rows)
         crds <- cats()$geometry
         crds <- round(crds[[1]][c(1, 2)], 4)
         
-        # append all to text output
-        txt <- paste0(txt, selsit, ' (Year ', cats()$yr, ', COMID ', cats()$COMID, ', ', crds[1], 'W/', crds[2], 'N)')
+        # Append all to text output without repetitions
+        txt <- paste0(txt, selsit, ' (Year ', years, ', COMID ', comid, ', ', crds[1], 'W/', crds[2], 'N)')
+
+        print("TXT")
+        print(txt)
+        
         
       }
       
