@@ -1,5 +1,5 @@
 ---
-title: "SQI dashboard v2.01"
+title: "SQI dashboard v3"
 output:
   flexdashboard::flex_dashboard:
     includes:
@@ -121,19 +121,16 @@ gauge_col <- c('#a9d70b', '#f9c802', '#ff0000')
 ```{r reactives}
 # selected site for results
 cats <- reactive({
-
   req(nrow(sitedat()) > 0)
+  req(input$year_select)  # Ensure year selection is available
   
-  # inputs
+  # Filter sitedat based on selected MasterID and selected year
   sitedat <- sitedat()
-  
-  # subset
-  out <- sitedat %>% 
-    filter(MasterID %in% selsit)
+  out <- sitedat %>%
+    filter(MasterID == selsit, yr == input$year_select)
   
   return(out)
-  
-  })
+})
 
 # choices for spatial filter
 spaflt <- reactive({
@@ -394,8 +391,17 @@ dstipi <- reactive({
 output$num_displayed_points_on_map <- renderText({
   # Separate the data based on the missing values
   sitedat <- sitedat()
-  complete_data_count <- nrow(sitedat %>% filter(missing_chemistry == 'NO', missing_habitat == 'NO'))
-  missing_data_count <- nrow(sitedat %>% filter(!(missing_chemistry == 'NO' & missing_habitat == 'NO')))
+  
+  # Count unique MasterID for complete and missing data
+  complete_data_count <- sitedat %>%
+    filter(data_complete == 'YES') %>%
+    summarize(count = n_distinct(MasterID)) %>%
+    pull(count)
+  
+  missing_data_count <- sitedat %>%
+    filter(data_complete == 'NO') %>%
+    summarize(count = n_distinct(MasterID)) %>%
+    pull(count)
   
   # Display both counts
   glue("Number of sites with completed data: {complete_data_count}\nNumber of sites with missing chemistry or missing habitat: {missing_data_count}")
@@ -407,51 +413,140 @@ output$map <- renderLeaflet({
   tomap <- input$tomap
   polys <- polys()
   sitedat <- sitedat()
-  
   req(nrow(polys) > 0)
-  
-  # Assign colors
-  cols <- getdsccol(sitedat[[tomap]])
-  names(cols) <- NULL
-  names(sitedat)[names(sitedat) %in% tomap] <- 'toshw'
-  
-  # Filter data into two groups
-  sitedat_group1 <- sitedat %>% 
-    filter(missing_chemistry == 'NO', missing_habitat == 'NO')
-  sitedat_group2 <- sitedat %>% 
-    filter(!(missing_chemistry == 'NO' & missing_habitat == 'NO'))
-  
-  # Legend colors
-  legcols <- getdsccol(palfac = tomap)
 
-  # Render the map
-  mapview(polys, fill = F, label = polys$pllb, homebutton = F, popup = NULL, legend = F) %>%
+  # Filter the complete and missing data
+  complete_data <- sitedat %>% 
+    filter(data_complete == 'YES')
+  
+  missing_data <- sitedat %>% 
+    filter(data_complete == 'NO') %>%
+  mutate(
+    missing_status_text = case_when(
+      missing_chemistry == "YES" & missing_habitat == "YES" ~ "MISSING BOTH CHEMISTRY AND HABITAT",
+      missing_chemistry == "YES" & missing_habitat == "NO" ~ "MISSING CHEMISTRY",
+      missing_chemistry == "NO" & missing_habitat == "YES" ~ "MISSING HABITAT",
+      TRUE ~ ""  # No missing information
+    )
+  )
+    
+  # Define colors for each StreamHealthIndex category
+  colors <- c(
+    'Healthy and unstressed' = '#008000',        # Green
+    'Healthy and resilient' = '#90EE90',          # LightGreen
+    'Impacted by unknown stress' = '#FFB6C1',     # LightPink
+    'Impacted and stressed' = '#DC143C',          # Crimson
+    'Healthy, uncertain stress' = '#FFFF00',      # Yellow
+    'Healthy and potentially unstressed' = '#008000' # Green
+  )
+  complete_data$color <- colors[complete_data$StreamHealthIndex]
+  
+  # Split missing data into separate data frames
+  missing_data_impacted_stressed <- missing_data %>% 
+    filter(StreamHealthIndex == "Impacted and stressed") %>%
+    mutate(icon = "impact-and-stressed.png")
+  
+  missing_data_healthy_uncertain_stress <- missing_data %>% 
+    filter(StreamHealthIndex == "Healthy, uncertain stress") %>%
+    mutate(icon = "healthy-uncertain-stress.png")
+  
+  missing_data_impacted_unknown_stress <- missing_data %>% 
+    filter(StreamHealthIndex == "Impacted by unknown stress") %>%
+    mutate(icon = "impact-by-unknown-stress.png")
+  
+  missing_data_healthy_unstressed <- missing_data %>% 
+    filter(StreamHealthIndex == "Healthy and potentially unstressed") %>%
+    mutate(icon = "healthy-potentially-unstressed-icon.png")
+  
+  # Create default icon for any missing data that doesn't fit into specific categories
+  missing_data_default <- missing_data %>%
+    filter(!StreamHealthIndex %in% c("Impacted and stressed", "Healthy, uncertain stress", "Impacted by unknown stress", "Healthy and potentially unstressed")) %>%
+    mutate(icon = "default.png")
+  
+  # Function to create icons dynamically based on icon column
+  make_icon <- function(icon) {
+    makeIcon(
+      iconUrl = paste0("https://nexus.sccwrp.org/smcchecker/download/icons-for-sqi/", icon),
+      iconWidth = 10,
+      iconHeight = 10
+    )
+  }
+  
+  legend_title <- HTML("
+    <div>
+      <strong>Shape:</strong> 
+      <span style='font-size: 1.2em;'>&#9899;</span> = Complete Data, 
+      <span style='font-size: 1.2em;'>&#9632;</span> = Missing Data
+    </div>
+    <div>
+      <strong>Color:</strong>
+    </div>
+  ")
+  
+  
+   # Render the map
+  map <- mapview(polys, fill = FALSE, label = polys$pllb, homebutton = FALSE, popup = NULL, legend = FALSE) %>%
     .@map %>%
+    
+    # Add markers for complete data with color based on StreamHealthIndex
     addCircleMarkers(
-      data = sitedat_group1, 
+      data = complete_data, 
       layerId = ~MasterID,
       stroke = TRUE,
       color = 'black',
       fill = TRUE,
-      fillColor = cols,
-      radius = 5, 
+      fillColor = ~color,   # Use the mapped color based on StreamHealthIndex,
+      radius = 8, 
       weight = 1,
       fillOpacity = 1,
-      label = ~paste0(MasterID, ' (', yr, '): ', toshw)
-    ) %>%
-    addCircleMarkers(
-      data = sitedat_group2, 
-      layerId = ~MasterID,
-      stroke = TRUE,
-      color = 'red',       # Different border color
-      fill = TRUE,
-      fillColor = cols,
-      radius = 7,          # Slightly larger marker
-      weight = 1,
-      fillOpacity = 0.6,   # Slightly transparent fill
-      label = ~paste0(MasterID, ' (', yr, '): ', toshw)
-    ) %>%
-    addLegend("bottomleft", colors = legcols$col, labels = legcols$nms, opacity = 1)
+      label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex)
+    )
+    
+  # Conditionally add missing data markers based on checkbox input
+  if (input$show_missing_data) {
+    map <- map %>%
+      addMarkers(
+        data = missing_data_impacted_stressed,
+        layerId = ~MasterID,
+        icon = make_icon("impact-and-stressed.png"),
+        label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex, " - ", missing_status_text)
+      ) %>%
+      addMarkers(
+        data = missing_data_healthy_uncertain_stress,
+        layerId = ~MasterID,
+        icon = make_icon("healthy-uncertain-stress.png"),
+        label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex, " - ", missing_status_text)
+      ) %>%
+      addMarkers(
+        data = missing_data_impacted_unknown_stress,
+        layerId = ~MasterID,
+        icon = make_icon("impact-by-unknown-stress.png"),
+        label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex, " - ", missing_status_text)
+      ) %>%
+      addMarkers(
+        data = missing_data_healthy_unstressed,
+        layerId = ~MasterID,
+        icon = make_icon("healthy-potentially-unstressed-icon.png"),
+        label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex, " - ", missing_status_text)
+      ) %>%
+      addMarkers(
+        data = missing_data_default,
+        layerId = ~MasterID,
+        icon = make_icon("default.png"),
+        label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex, " - ", missing_status_text)
+      )
+  }
+  
+  # Add legend for colors
+  map %>%
+    addLegend(
+      title = legend_title,
+      position = "bottomleft",
+      colors = unname(colors),        # Pass only the colors
+      labels = names(colors),         # Pass the labels
+      opacity = 1
+    )
+
 })
 
 # Leaflet proxy for marker select
@@ -460,78 +555,113 @@ map <- leafletProxy("map")
 # Binding for marker select and year
 makeReactiveBinding('selsit')
 
-# Selection
 observeEvent(input$map_marker_click, {
-  selsit <<- input$map_marker_click$id
+  # Update selected site
+  point_clicked_id <<- input$map_marker_click$id
+  
+  # Get sitedat and filter by selected MasterID
+  sitedat <- sitedat()
+  years <- sitedat %>%
+    filter(MasterID == point_clicked_id) %>%
+    pull(yr) %>%
+    unique() %>%
+    sort(decreasing = TRUE)  # Sort years in ascending order
+  
+  # Update the year selectInput with available years for the selected MasterID
+  updateSelectInput(session, "year_select", choices = years, selected = years[1])
 })
 
+# Selection
 observeEvent(input$map_marker_click, {
-  # inputs
-  tomap <- input$tomap
-  sitedat <- sitedat()
   
-  # colors
-  cols <- getdsccol(sitedat[[tomap]])
-  names(cols) <- NULL
-  names(sitedat)[names(sitedat) %in% tomap] <- 'toshw'
+  selsit <<- input$map_marker_click$id
   
-  # Filter groups based on selection to reapply styling
-  sitedat_group1 <- sitedat %>% 
-    filter(missing_chemistry == 'NO', missing_habitat == 'NO')
-  sitedat_group2 <- sitedat %>% 
-    filter(!(missing_chemistry == 'NO' & missing_habitat == 'NO'))
-  
-  # Filter for selected site
-  selsitplo <- sitedat %>% filter(MasterID == selsit)
-  selsitplocol <- getdsccol(selsitplo[['toshw']])
-  names(selsitplocol) <- NULL
-  
-  # Clear markers and reapply styles for all markers, including selected one
-  map <- map %>%
-    clearMarkers() %>%
-    
-    # Group 1 markers
-    addCircleMarkers(
-      data = sitedat_group1, 
-      layerId = ~MasterID,
-      stroke = TRUE,
-      color = 'black',
-      fill = TRUE,
-      fillColor = cols,
-      radius = 5, 
-      weight = 1,
-      fillOpacity = 1,
-      label = ~paste0(MasterID, ' (', yr, '): ', toshw)
-    ) %>%
-    
-    # Group 2 markers
-    addCircleMarkers(
-      data = sitedat_group2, 
-      layerId = ~MasterID,
-      stroke = TRUE,
-      color = 'red',       # Different border color
-      fill = TRUE,
-      fillColor = cols,
-      radius = 7,          # Slightly larger marker
-      weight = 1,
-      fillOpacity = 0.6,   # Slightly transparent fill
-      label = ~paste0(MasterID, ' (', yr, '): ', toshw)
-    ) %>%
-    
-    # Highlight the selected marker
-    addCircleMarkers(
-      data = selsitplo, 
-      layerId = ~MasterID,
-      stroke = TRUE,
-      color = 'black',
-      fillColor = selsitplocol,
-      fill = TRUE,
-      radius = 10, 
-      weight = 6,
-      fillOpacity = 1,
-      label = ~paste0(MasterID, ' (', yr, '): ', toshw)
-    )
 })
+
+# observeEvent(input$map_marker_click, {
+#   click <- input$map_marker_click
+#   
+#   if (!is.null(click)) {
+#     clicked_id <- click$id
+#     
+#     # Increase the radius of the clicked marker
+#     leafletProxy("map") %>%
+#       setRadius(layerId = clicked_id, radius = 10)
+#     
+#     # Reset the radius of the previously clicked marker if it's different
+#     if (!is.null(previously_clicked()) && previously_clicked() != clicked_id) {
+#       leafletProxy("map") %>%
+#         setRadius(layerId = previously_clicked(), radius = 5)
+#     }
+#     
+#     # Update the previously clicked marker ID
+#     previously_clicked(clicked_id)
+#   }
+# })
+
+
+# observeEvent(input$map_marker_click, {
+#   # inputs
+#   tomap <- input$tomap
+#   sitedat <- sitedat()
+#   
+#   # colors
+#   cols <- getdsccol(sitedat[[tomap]])
+#   names(cols) <- NULL
+#   names(sitedat)[names(sitedat) %in% tomap] <- 'toshw'
+#   
+#   # Filter groups based on selection to reapply styling
+#   sitedat_group1 <- sitedat %>% 
+#     filter(missing_chemistry == 'NO', missing_habitat == 'NO')
+#   sitedat_group2 <- sitedat %>% 
+#     filter(!(missing_chemistry == 'NO' & missing_habitat == 'NO'))
+#   
+#   # Filter for selected site
+#   selsitplo <- sitedat %>% filter(MasterID == selsit)
+#   selsitplocol <- getdsccol(selsitplo[['toshw']])
+#   names(selsitplocol) <- NULL
+#   
+#   # Clear markers and reapply styles for all markers, including selected one
+#   # map <- map %>%
+#   #   clearMarkers() %>%
+#   #   
+#   #   # Group 1 markers
+#   #   addCircleMarkers(
+#   #     data = sitedat_group1, 
+#   #     layerId = ~MasterID,
+#   #     stroke = TRUE,
+#   #     color = 'black',
+#   #     fill = TRUE,
+#   #     fillColor = cols,
+#   #     radius = 5, 
+#   #     weight = 1,
+#   #     fillOpacity = 1,
+#   #     label = ~paste0(MasterID, ' (', yr, '): ', toshw)
+#   #   ) %>%
+#   #   
+#   #   # Group 2 markers
+#   #   addAwesomeMarkers(
+#   #     data = sitedat_group2, 
+#   #     layerId = ~MasterID,
+#   #     icon = missing_icons(),
+#   #     label = ~paste0(MasterID, ' (', yr, '): ', toshw)
+#   #   ) 
+#   # %>%
+#   #   
+#   #   # Highlight the selected marker
+#   #   addCircleMarkers(
+#   #     data = selsitplo, 
+#   #     layerId = ~MasterID,
+#   #     stroke = TRUE,
+#   #     color = 'black',
+#   #     fillColor = selsitplocol,
+#   #     fill = TRUE,
+#   #     radius = 10, 
+#   #     weight = 6,
+#   #     fillOpacity = 1,
+#   #     label = ~paste0(MasterID, ' (', yr, '): ', toshw)
+#   #   )
+# })
 
 
 
@@ -541,19 +671,26 @@ output$overall <- flexdashboard::renderValueBox({
   req(nrow(cats()) > 0)
   txtin <- cats()$StreamHealthIndex
   colin <- getdsccol(txtin)
+  colin <- ifelse(is.na(colin), "gray", colin)
   flexdashboard::valueBox(tags$p(txtin, style = "font-size: 60%"), icon = 'glyphicon-plus', color = colin)
   })
+
+
 output$biolcon <- flexdashboard::renderValueBox({
   req(nrow(cats()) > 0)
   txtin <- cats()$BiologicalCondition
   colin <- getdsccol(txtin)
+  colin <- ifelse(is.na(colin), "gray", colin)
   flexdashboard::valueBox(tags$p(txtin, style = "font-size: 60%"), icon = 'glyphicon-leaf', color = colin)
   })
 output$strsdet <- flexdashboard::renderValueBox({
   req(nrow(cats()) > 0)
   txtin <- cats()$OverallStressCondition_detail
   colin <- getdsccol(txtin)
+
+  colin <- ifelse(is.na(colin), "gray", colin)
   flexdashboard::valueBox(tags$p(txtin, style = "font-size: 60%"), icon = 'glyphicon-flash', color = colin)
+  
   })
 
 ##
@@ -745,9 +882,7 @@ output$plodsthab <- renderPlot({
   
   # input
   dstplo <- dsthab()
-  print("look here")
-  print(packageVersion("patchwork"))
-  print(dstplo$plos)
+
   # patchwork
   #wrap_plots(unlist(dstplo), nrow = 1)
   grid.arrange(grobs = dstplo$plos, nrow = 1)
@@ -795,7 +930,9 @@ output$dltab <- downloadHandler(
 generate_pdf_report <- function(file) {
   
     # data
-    tmp_dat <- sitedat() %>% rename(
+    tmp_dat <- sitedat() %>% 
+      filter(data_complete == 'YES') %>%
+      rename(
       biological_condition = BiologicalCondition,
       stress_condition = OverallStressCondition_detail,
       SQI = StreamHealthIndex
@@ -956,26 +1093,20 @@ Sidebar {.sidebar data-width=700}
 
 ```{r}
 # select spatial filter
-column(width = 12, 
-  
-  column(width = 6, 
-         
+column(
+  width = 12, 
+  column(
+    width = 6, 
     selectInput('flby', 'Filter by:', choices = c('SMC watersheds', 'Counties', 'Regional boards', 'Constraint classes', 'Years'))
-                
-  ), 
-  
-  column(width = 6, 
-         
+  ),
+  column(
+    width = 6,
     renderUI({
-      
       # input
       spaflt <- spaflt()
-
       pickerInput(inputId = "flts", label = 'Select site filters:', choices = spaflt,
         options = list(`actions-box` = TRUE, size = 20), selected = spaflt, multiple = TRUE)      
-      
     })
-           
   )
        
 )
@@ -993,12 +1124,13 @@ column(width = 12,
       ), 
       selected = 'Overall'
     ),
-    textOutput("num_displayed_points_on_map")
+    textOutput("num_displayed_points_on_map"),
+    checkboxInput("show_missing_data", "Show Missing Data", value = TRUE)
   
   ),
   
   column(width = 6, 
-         
+    selectInput("year_select", "Select Year", choices = NULL),
     renderText({
       
       txt <- 'Selected site: '
@@ -1018,9 +1150,7 @@ column(width = 12,
         # Append all to text output without repetitions
         txt <- paste0(txt, selsit, ' (Year ', years, ', COMID ', comid, ', ', crds[1], 'W/', crds[2], 'N)')
 
-        print("TXT")
-        print(txt)
-        
+
         
       }
       
@@ -1064,7 +1194,7 @@ fluidRow(
 
 ```{r}
 fluidRow(
-  column(12, 'Click here to download a summary of selected sites:'),
+  column(12, 'Click here to download a summary of sites with completed data:'),
   column(2, downloadButtonRmd('dlreport', ''))
 )
 ```

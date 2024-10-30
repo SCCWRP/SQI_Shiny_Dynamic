@@ -1,6 +1,8 @@
 # descriptor colors for sqi
 getdsccol <- function(dscin = NULL, palout = F, palfac = NULL){
   
+
+  
   if(is.factor(dscin))
     stop('dscin must be character')
 
@@ -14,15 +16,19 @@ getdsccol <- function(dscin = NULL, palout = F, palfac = NULL){
   l5 <- '#4F94CD' #'steelblue3'
   l6 <- '#00C5CD' #'turquoise3'
   l7 <- '#8B0000' #'red4'
+  l8 <- '#FFFF00' # 'Yellow'
   
-  if(palout) return(c(l1, l2, l3, l4, l5, l6, l7))
+  if(palout) return(c(l1, l2, l3, l4, l5, l6, l7,l8))
 
   #  color categories
   StreamHealthIndex <- list(
     'Healthy and unstressed' = l1, 
     'Healthy and resilient' = l2,
     'Impacted by unknown stress' = l3,
-    'Impacted and stressed' = l4
+    'Impacted and stressed' = l4,
+    'Healthy, uncertain stress' = l8,
+    'Healthy and potentially unstressed' = l1
+    
   )                                   
   BiologicalCondition <- list(
     'Healthy' = l1,
@@ -40,7 +46,8 @@ getdsccol <- function(dscin = NULL, palout = F, palfac = NULL){
     'Stressed by chemistry degradation' = l5,
     'Stressed by habitat degradation' = l6,
     'Stressed by chemistry and habitat degradation' = l4, 
-    'Stressed by low levels of chemistry or habitat degradation' = l7
+    'Stressed by low levels of chemistry or habitat degradation' = l7,
+    'Stress not assessed' = 'grey'
   )
 
   # return individual palette with label is provided

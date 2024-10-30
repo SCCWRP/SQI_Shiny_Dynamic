@@ -24,15 +24,34 @@ sqi_dat <- sqi_dat_raw %>%
     CSCI = csci_max,
     IPI = ipi,
     # stream class, scape categories
-    strcls = ref10, lower = qt10, meds = qt50, upper = qt90,
+    strcls = ref10, 
+    lower = qt10, 
+    meds = qt50, 
+    upper = qt90,
     # phab metrics
-    Ev_FlowHab = ev_flowhab_score, H_AqHab = h_aqhab_score,H_SubNat = h_subnat_score, PCT_SAFN = pct_safn_score, XCMG = xcmg_score,
+    Ev_FlowHab = ev_flowhab_score, 
+    H_AqHab = h_aqhab_score,
+    H_SubNat = h_subnat_score, 
+    PCT_SAFN = pct_safn_score, 
+    XCMG = xcmg_score,
     # cram score and metrics
     indexscore_cram = cram_score,
-    ps = cram_physicalstructure, hy = cram_hydrology, blc = cram_bufferandladscapecontext, bs = cram_bioticstructure,
+    ps = cram_physicalstructure, 
+    hy = cram_hydrology, 
+    blc = cram_bufferandladscapecontext, 
+    bs = cram_bioticstructure,
     # biostim analytes
-    Cond = cond, TN = total_n_all, TP = total_p_all) %>%
-  mutate(Ev_FlowHab_raw = ev_flowhab, H_AqHab_raw = h_aqhab,H_SubNat_raw = h_subnat, PCT_SAFN_raw = pct_safn, XCMG_raw = xcmg) %>%
+    Cond = cond, 
+    TN = total_n_all, 
+    TP = total_p_all
+  ) %>%
+  mutate(
+    Ev_FlowHab_raw = ev_flowhab, 
+    H_AqHab_raw = h_aqhab,
+    H_SubNat_raw = h_subnat, 
+    PCT_SAFN_raw = pct_safn, 
+    XCMG_raw = xcmg
+  ) %>%
   # assign levels to stream class
   mutate(
     strcls = factor(
@@ -53,12 +72,12 @@ sqi_dat_final <- sqi_dat %>% SQI::sqi()
 # Update StreamHealthIndex based on conditions
 sqi_dat_final <- sqi_dat_final %>%
   mutate(
-    updateStreamHealthIndex = case_when(
+    StreamHealthIndex = case_when(
       StreamHealthIndex == "Healthy and unstressed" & missing_habitat == "YES" & missing_chemistry == "NO" ~ "Healthy and potentially unstressed",
-      StreamHealthIndex == "Healthy and resilient" & missing_habitat == "YES" & missing_chemistry == "NO" ~ "Healthy and potentially unstressed",
       StreamHealthIndex == "Healthy and unstressed" & missing_habitat == "NO" & missing_chemistry == "YES" ~ "Healthy and potentially unstressed",
-      StreamHealthIndex == "Healthy and resilient" & missing_habitat == "NO" & missing_chemistry == "YES" ~ "Healthy and potentially unstressed",
       StreamHealthIndex == "Healthy and unstressed" & missing_habitat == "YES" & missing_chemistry == "YES" ~ "Healthy, uncertain stress",
+      StreamHealthIndex == "Healthy and resilient" & missing_habitat == "YES" & missing_chemistry == "NO" ~ "Healthy and potentially unstressed",
+      StreamHealthIndex == "Healthy and resilient" & missing_habitat == "NO" & missing_chemistry == "YES" ~ "Healthy and potentially unstressed",
       StreamHealthIndex == "Healthy and resilient" & missing_habitat == "YES" & missing_chemistry == "YES" ~ "Healthy, uncertain stress",
       TRUE ~ StreamHealthIndex  # Retain the original value if no conditions are met
     )
@@ -68,15 +87,15 @@ sqi_dat_final <- sqi_dat_final %>%
 sqi_dat_final <- sqi_dat_final %>%
   mutate(
     OverallStressCondition_detail = case_when(
-      missing_chemistry == "YES" & missing_habitat == "NO" & OverallStressCondition == "Low stress" ~ "Low stress from habitat; water chemistry not assessed",
-      missing_chemistry == "YES" & missing_habitat == "NO" & OverallStressCondition == "Stressed by chemistry degradation" ~ "Low stress from habitat; water chemistry not assessed",
-      missing_chemistry == "YES" & missing_habitat == "NO" & OverallStressCondition == "Stressed by habitat degradation" ~ "Stressed by habitat degradation; water chemistry not assessed",
-      missing_chemistry == "YES" & missing_habitat == "NO" & OverallStressCondition == "Stressed by chemistry and habitat degradation" ~ "Stressed by habitat degradation; water chemistry not assessed",
+      missing_chemistry == "YES" & missing_habitat == "NO" & OverallStressCondition_detail == "Low stress" ~ "Low stress from habitat; water chemistry not assessed",
+      missing_chemistry == "YES" & missing_habitat == "NO" & OverallStressCondition_detail == "Stressed by chemistry degradation" ~ "Low stress from habitat; water chemistry not assessed",
+      missing_chemistry == "YES" & missing_habitat == "NO" & OverallStressCondition_detail == "Stressed by habitat degradation" ~ "Stressed by habitat degradation; water chemistry not assessed",
+      missing_chemistry == "YES" & missing_habitat == "NO" & OverallStressCondition_detail == "Stressed by chemistry and habitat degradation" ~ "Stressed by habitat degradation; water chemistry not assessed",
       
-      missing_chemistry == "NO" & missing_habitat == "YES" & OverallStressCondition == "Low stress" ~ "Low stress from water chemistry; habitat not assessed",
-      missing_chemistry == "NO" & missing_habitat == "YES" & OverallStressCondition == "Stressed by chemistry degradation" ~ "Stressed by chemistry degradation; habitat not assessed",
-      missing_chemistry == "NO" & missing_habitat == "YES" & OverallStressCondition == "Stressed by habitat degradation" ~ "Low stress from water chemistry; habitat not assessed",
-      missing_chemistry == "NO" & missing_habitat == "YES" & OverallStressCondition == "Stressed by chemistry and habitat degradation" ~ "Stressed by water chemistry degradation; habitat not assessed",
+      missing_chemistry == "NO" & missing_habitat == "YES" & OverallStressCondition_detail == "Low stress" ~ "Low stress from water chemistry; habitat not assessed",
+      missing_chemistry == "NO" & missing_habitat == "YES" & OverallStressCondition_detail == "Stressed by chemistry degradation" ~ "Stressed by chemistry degradation; habitat not assessed",
+      missing_chemistry == "NO" & missing_habitat == "YES" & OverallStressCondition_detail == "Stressed by habitat degradation" ~ "Low stress from water chemistry; habitat not assessed",
+      missing_chemistry == "NO" & missing_habitat == "YES" & OverallStressCondition_detail == "Stressed by chemistry and habitat degradation" ~ "Stressed by water chemistry degradation; habitat not assessed",
       
       missing_chemistry == "YES" & missing_habitat == "YES" ~ "Stress not assessed",
       
