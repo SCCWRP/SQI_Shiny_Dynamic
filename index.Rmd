@@ -393,15 +393,18 @@ output$num_displayed_points_on_map <- renderText({
   sitedat <- sitedat()
   
   # Count unique MasterID for complete and missing data
-  complete_data_count <- sitedat %>%
-    filter(data_complete == 'YES') %>%
-    summarize(count = n_distinct(MasterID)) %>%
-    pull(count)
+  complete_data <- sitedat %>% 
+    group_by(MasterID) %>%
+    filter(all(data_complete == 'YES')) %>%
+    ungroup()
   
-  missing_data_count <- sitedat %>%
-    filter(data_complete == 'NO') %>%
-    summarize(count = n_distinct(MasterID)) %>%
-    pull(count)
+  complete_data_count <- nrow(complete_data)
+  
+  missing_data <- sitedat %>% 
+    group_by(MasterID) %>%
+    filter(any(data_complete == 'NO')) %>%
+    ungroup()
+  missing_data_count <- nrow(missing_data)
   
   # Display both counts
   glue("Number of sites with complete data: {complete_data_count}\nNumber of sites with missing chemistry or missing habitat data: {missing_data_count}")
@@ -409,6 +412,7 @@ output$num_displayed_points_on_map <- renderText({
 
 
 output$map <- renderLeaflet({
+  
   # input
   tomap <- input$tomap
   polys <- polys()
@@ -416,19 +420,28 @@ output$map <- renderLeaflet({
   req(nrow(polys) > 0)
 
   # Filter the complete and missing data
-  complete_data <- sitedat %>% 
-    filter(data_complete == 'YES')
-  
+  complete_data <- sitedat %>%
+    group_by(MasterID) %>%
+    filter(all(data_complete == 'YES')) %>%
+    ungroup()
+    
   missing_data <- sitedat %>% 
-    filter(data_complete == 'NO') %>%
+    group_by(MasterID) %>%
+    filter(any(data_complete == 'NO')) %>%
+    ungroup() %>%
+    mutate(
+      missing_status_text = case_when(
+        missing_chemistry == "YES" & missing_habitat == "YES" ~ "MISSING BOTH CHEMISTRY AND HABITAT",
+        missing_chemistry == "YES" & missing_habitat == "NO" ~ "MISSING CHEMISTRY",
+        missing_chemistry == "NO" & missing_habitat == "YES" ~ "MISSING HABITAT",
+        TRUE ~ ""  # No missing information
+      )
+    ) %>%
+  group_by(MasterID) %>%
   mutate(
-    missing_status_text = case_when(
-      missing_chemistry == "YES" & missing_habitat == "YES" ~ "MISSING BOTH CHEMISTRY AND HABITAT",
-      missing_chemistry == "YES" & missing_habitat == "NO" ~ "MISSING CHEMISTRY",
-      missing_chemistry == "NO" & missing_habitat == "YES" ~ "MISSING HABITAT",
-      TRUE ~ ""  # No missing information
-    )
-  )
+    StreamHealthIndex_most_recent = StreamHealthIndex[which.max(yr)]
+  ) %>%
+  ungroup()
     
   # Define colors for each StreamHealthIndex category
   colors <- c(
@@ -439,29 +452,36 @@ output$map <- renderLeaflet({
     'Healthy, uncertain stress' = '#FFFF00',      # Yellow
     'Healthy and potentially unstressed' = '#008000' # Green
   )
-  complete_data$color <- colors[complete_data$StreamHealthIndex]
-  
+  complete_data$color <- as.character(colors[complete_data$StreamHealthIndex])
+
   # Split missing data into separate data frames
   missing_data_impacted_stressed <- missing_data %>% 
-    filter(StreamHealthIndex == "Impacted and stressed") %>%
+    filter(StreamHealthIndex_most_recent == "Impacted and stressed") %>%
     mutate(icon = "impact-and-stressed.png")
   
   missing_data_healthy_uncertain_stress <- missing_data %>% 
-    filter(StreamHealthIndex == "Healthy, uncertain stress") %>%
+    filter(StreamHealthIndex_most_recent == "Healthy, uncertain stress") %>%
     mutate(icon = "healthy-uncertain-stress.png")
   
   missing_data_impacted_unknown_stress <- missing_data %>% 
-    filter(StreamHealthIndex == "Impacted by unknown stress") %>%
+    filter(StreamHealthIndex_most_recent == "Impacted by unknown stress") %>%
     mutate(icon = "impact-by-unknown-stress.png")
   
   missing_data_healthy_unstressed <- missing_data %>% 
-    filter(StreamHealthIndex == "Healthy and potentially unstressed") %>%
+    filter(StreamHealthIndex_most_recent %in%  c("Healthy and potentially unstressed", "Healthy and unstressed")) %>%
     mutate(icon = "healthy-potentially-unstressed-icon.png")
   
   # Create default icon for any missing data that doesn't fit into specific categories
   missing_data_default <- missing_data %>%
-    filter(!StreamHealthIndex %in% c("Impacted and stressed", "Healthy, uncertain stress", "Impacted by unknown stress", "Healthy and potentially unstressed")) %>%
-    mutate(icon = "default.png")
+    filter(
+      !StreamHealthIndex_most_recent %in% c(
+        "Impacted and stressed", 
+        "Healthy, uncertain stress", 
+        "Impacted by unknown stress", 
+        "Healthy and potentially unstressed")
+    ) %>%
+    #mutate(icon = "default.png")
+    mutate(icon = "healthy-potentially-unstressed-icon.png")
   
   # Function to create icons dynamically based on icon column
   make_icon <- function(icon) {
@@ -504,37 +524,41 @@ output$map <- renderLeaflet({
     
   # Conditionally add missing data markers based on checkbox input
   if (input$show_missing_data) {
+  #if (TRUE) {
     map <- map %>%
       addMarkers(
         data = missing_data_impacted_stressed,
         layerId = ~MasterID,
         icon = make_icon("impact-and-stressed.png"),
-        label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex, " - ", missing_status_text)
+        label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex_most_recent, " - ", missing_status_text)
       ) %>%
       addMarkers(
         data = missing_data_healthy_uncertain_stress,
         layerId = ~MasterID,
         icon = make_icon("healthy-uncertain-stress.png"),
-        label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex, " - ", missing_status_text)
+        label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex_most_recent, " - ", missing_status_text)
       ) %>%
       addMarkers(
         data = missing_data_impacted_unknown_stress,
         layerId = ~MasterID,
         icon = make_icon("impact-by-unknown-stress.png"),
-        label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex, " - ", missing_status_text)
+        label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex_most_recent, " - ", missing_status_text)
       ) %>%
       addMarkers(
         data = missing_data_healthy_unstressed,
         layerId = ~MasterID,
         icon = make_icon("healthy-potentially-unstressed-icon.png"),
-        label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex, " - ", missing_status_text)
-      ) %>%
-      addMarkers(
-        data = missing_data_default,
-        layerId = ~MasterID,
-        icon = make_icon("default.png"),
-        label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex, " - ", missing_status_text)
+        label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex_most_recent, " - ", missing_status_text)
       )
+    if (nrow(missing_data_default) > 0){
+      map <- map %>%
+        addMarkers(
+          data = missing_data_default,
+          layerId = ~MasterID,
+          icon = make_icon("healthy-potentially-unstressed-icon.png"),
+          label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex_most_recent, " - ", missing_status_text)
+        )
+    }
   }
   
   # Add legend for colors
@@ -546,7 +570,6 @@ output$map <- renderLeaflet({
       labels = names(colors),         # Pass the labels
       opacity = 1
     )
-
 })
 
 # Leaflet proxy for marker select
@@ -1109,6 +1132,44 @@ output$dl_smc_lu_means <- downloadHandler(
   }
 )
 
+
+output$missing_info <- renderText({
+  # Retrieve the selected MasterID from the cats() reactive expression
+  selected_masterid <- cats()$MasterID
+  print("selected_masterid")
+  print(selected_masterid)
+  req(selected_masterid)
+  # Filter the site data based on the selected MasterID
+  filtered_dat <- sitedat() %>% filter(MasterID == selected_masterid)
+  req
+  # Check if there is any filtered data
+  if(nrow(filtered_dat) == 0){
+    return("No data available for the selected MasterID.")
+  }
+  
+  # Generate missing information text for each year in filtered data
+  missing_info_text <- filtered_dat %>%
+    # Adjust the year label by subtracting 1, if necessary
+    mutate(
+      YearLabel = as.character(yr),
+      # Determine missing information
+      MissingInfo = case_when(
+        missing_chemistry == "YES" & missing_habitat == "YES" ~ "Missing chemistry and missing habitat data",
+        missing_chemistry == "YES" ~ "Missing chemistry data",
+        missing_habitat == "YES" ~ "Missing habitat data",
+        TRUE ~ "Data Complete"
+      )
+    ) %>%
+    # Combine year and missing information into one line for each year
+    mutate(Line = paste0(YearLabel, ": ", MissingInfo)) %>%
+    # Extract the lines as a vector and collapse into a single text block
+    pull(Line) %>%
+    paste(collapse = " | ")
+  
+  return(missing_info_text)
+})
+
+
 ```
 
 
@@ -1181,7 +1242,9 @@ column(width = 12,
       
       return(txt)
       
-    })
+    }),
+    tags$p("Below is the summary data status for all years. If there is a year with missing data, data were filled with the estimated values for that year.", style = "font-size: 14px;"),
+    textOutput("missing_info")
     
   )
   

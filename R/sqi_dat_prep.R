@@ -79,6 +79,7 @@ sqi_dat_final <- sqi_dat_final %>%
       StreamHealthIndex == "Healthy and resilient" & missing_habitat == "YES" & missing_chemistry == "NO" ~ "Healthy and potentially unstressed",
       StreamHealthIndex == "Healthy and resilient" & missing_habitat == "NO" & missing_chemistry == "YES" ~ "Healthy and potentially unstressed",
       StreamHealthIndex == "Healthy and resilient" & missing_habitat == "YES" & missing_chemistry == "YES" ~ "Healthy, uncertain stress",
+      StreamHealthIndex == "Impacted and stressed" & missing_habitat == "YES" & missing_chemistry == "YES" ~ "Impacted by unknown stress",
       TRUE ~ StreamHealthIndex  # Retain the original value if no conditions are met
     )
   )
