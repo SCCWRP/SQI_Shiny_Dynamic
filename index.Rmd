@@ -404,7 +404,7 @@ output$num_displayed_points_on_map <- renderText({
     pull(count)
   
   # Display both counts
-  glue("Number of sites with completed data: {complete_data_count}\nNumber of sites with missing chemistry or missing habitat: {missing_data_count}")
+  glue("Number of sites with complete data: {complete_data_count}\nNumber of sites with missing chemistry or missing habitat data: {missing_data_count}")
 })
 
 
@@ -496,7 +496,7 @@ output$map <- renderLeaflet({
       color = 'black',
       fill = TRUE,
       fillColor = ~color,   # Use the mapped color based on StreamHealthIndex,
-      radius = 8, 
+      radius = 6, 
       weight = 1,
       fillOpacity = 1,
       label = ~paste0(MasterID, ' (', yr, '): ', StreamHealthIndex)
@@ -1084,6 +1084,31 @@ output$dlreport <- downloadHandler(
         }
 )
 
+
+pool <- pool::dbPool(
+  drv = RPostgreSQL::PostgreSQL(),
+  dbname = Sys.getenv("dbname"),
+  host = Sys.getenv("host"),
+  user = Sys.getenv("user"),
+  password = Sys.getenv("password")
+)
+
+# Function to query the table
+get_smc_lu_means <- function() {
+  pool::dbGetQuery(pool, "SELECT * FROM smc_lu_means")
+}
+
+
+output$dl_smc_lu_means <- downloadHandler(
+  filename = function() {
+    paste("smc_lu_means", Sys.Date(), ".csv", sep = "")
+  },
+  content = function(file) {
+    data <- get_smc_lu_means()
+    write.csv(data, file, row.names = FALSE)
+  }
+)
+
 ```
 
 
@@ -1125,12 +1150,12 @@ column(width = 12,
       selected = 'Overall'
     ),
     textOutput("num_displayed_points_on_map"),
-    checkboxInput("show_missing_data", "Show Missing Data", value = TRUE)
+    checkboxInput("show_missing_data", "Include sites with missing data", value = TRUE)
   
   ),
   
   column(width = 6, 
-    selectInput("year_select", "Select Year", choices = NULL),
+    selectInput("year_select", "Select a year", choices = NULL),
     renderText({
       
       txt <- 'Selected site: '
@@ -1194,8 +1219,15 @@ fluidRow(
 
 ```{r}
 fluidRow(
-  column(12, 'Click here to download a summary of sites with completed data:'),
+  column(12, 'Click here to download a summary of sites with complete data:'),
   column(2, downloadButtonRmd('dlreport', ''))
+)
+```
+
+```{r}
+fluidRow(
+  column(12, 'Click here to download estimates for missing values:'),
+  column(2, downloadButtonRmd('dl_smc_lu_means', ''))
 )
 ```
 
