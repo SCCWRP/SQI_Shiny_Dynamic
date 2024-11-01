@@ -1,93 +1,114 @@
-# Script pulling the SQI dataset from the SMC and reformatting it to align with Shiny dashboard script
-# This is what makes the dataset "Dynamic"
-
-# by Annie Holt 4/13/2022
-# Generally have to prep/rename columns and clean dataset a bit 
-# Then run through SQI function to calculate
-
-# Data Assembly notes (this was all done in a database query):
-# Max Bio sample (ASCI, CSCI) was taken per masterid/sampledate
-# Average Chemistry sample (TN, TP, Cond) was taken per masterid/sampledate
-# Chemistry Data (TN, TP, Cond) was joined to Bio Data (ASCI, CSCI) by masterid and sampledate
-# Habitat Data (PHAB, CRAM) was joined to Bio/Chem Data by masterid and year
-
-# If there were multiple samples in one year, just keep most recent row of data; we just want one row per masterid
-# Also only kept 'complete' data rows (have all Chem, Bio, Hab metrics per site/year)
-
 # required libraries
 library(tidyverse)
 library(sf)
 library(SQI)
+library(dplyr)
 
-# Import new/dynamic data
-# this dataset is created as a database View in SCCWRP's SMC database (vw_sqi_dat)
-# to change the dataset/how it is assembled, need to edit the View ... though some changes can be made below as well if don't need to restructure
-# should be in-house accessible only
-sqi_raw <- read_csv("https://nexus.sccwrp.org/smcchecker/sqi_rawdata")
 
-# # load underlying shapefiles
-# # do this in app instead
-# data(sheds)
-# data(cntys)
-# data(rwqbs)
-# data(cnstr)
-# # old data for reference
-# # data("sqidat")
+pool <- pool::dbPool(
+  drv = RPostgreSQL::PostgreSQL(),
+  dbname = Sys.getenv("dbname"),
+  host = Sys.getenv("host"),
+  user = Sys.getenv("user"),
+  password = Sys.getenv("password")
+)
 
-sqidat_fordash <- sqi_raw %>% 
-  # column renaming to match with names in index.Rmd 
-  rename(MasterID = masterid, COMID = comid, 
-         
-         yr = year, ASCI = d_asci_max, CSCI = csci_max, IPI = ipi,
-         # stream class, scape categories
-         strcls = ref10, lower = qt10, meds = qt50, upper = qt90,
-         # phab metrics
-         Ev_FlowHab = ev_flowhab_score, H_AqHab = h_aqhab_score,H_SubNat = h_subnat_score, PCT_SAFN = pct_safn_score, XCMG = xcmg_score,
-         # cram score and metrics
-         indexscore_cram = cram_score,
-         ps = cram_physicalstructure, hy = cram_hydrology, blc = cram_bufferandladscapecontext, bs = cram_bioticstructure,
-         # biostim analytes
-         Cond = cond, TN = total_n_all, TP = total_p_all) %>% 
-  mutate(Ev_FlowHab_raw = ev_flowhab, H_AqHab_raw = h_aqhab,H_SubNat_raw = h_subnat, PCT_SAFN_raw = pct_safn, XCMG_raw = xcmg) %>%
+sqi_dat_raw <- pool::dbGetQuery(pool, "SELECT * FROM vw_sqi_dat_missing_filled;")
+
+sqi_dat <- sqi_dat_raw %>%
+  rename(
+    MasterID = masterid,
+    COMID = comid,
+    yr = year,
+    ASCI = d_asci_max,
+    CSCI = csci_max,
+    IPI = ipi,
+    # stream class, scape categories
+    strcls = ref10, 
+    lower = qt10, 
+    meds = qt50, 
+    upper = qt90,
+    # phab metrics
+    Ev_FlowHab = ev_flowhab_score, 
+    H_AqHab = h_aqhab_score,
+    H_SubNat = h_subnat_score, 
+    PCT_SAFN = pct_safn_score, 
+    XCMG = xcmg_score,
+    # cram score and metrics
+    indexscore_cram = cram_score,
+    ps = cram_physicalstructure, 
+    hy = cram_hydrology, 
+    blc = cram_bufferandladscapecontext, 
+    bs = cram_bioticstructure,
+    # biostim analytes
+    Cond = cond, 
+    TN = total_n_all, 
+    TP = total_p_all
+  ) %>%
+  mutate(
+    Ev_FlowHab_raw = ev_flowhab, 
+    H_AqHab_raw = h_aqhab,
+    H_SubNat_raw = h_subnat, 
+    PCT_SAFN_raw = pct_safn, 
+    XCMG_raw = xcmg
+  ) %>%
   # assign levels to stream class
-  mutate(strcls  = factor(strcls, levels = c("likely unconstrained", "possibly unconstrained", "possibly constrained",
-                                             "likely constrained"))) %>% 
-  
-  # final columns needed for Shiny
-  select(MasterID, COMID, latitude, longitude, yr, csci_sampledate, ASCI, CSCI, IPI, Ev_FlowHab, Ev_FlowHab_raw, H_AqHab, H_AqHab_raw, 
-         H_SubNat, H_SubNat_raw,  PCT_SAFN, PCT_SAFN_raw,  XCMG, XCMG_raw,
-         indexscore_cram, ps, hy, blc, bs, Cond, TN, TP, strcls, lower, meds, upper) %>% 
-  
-  # only keep data that has complete data across below metrics (No NAs) 
-  drop_na(ASCI, CSCI, IPI, Ev_FlowHab, H_AqHab, H_SubNat, PCT_SAFN, XCMG, indexscore_cram, ps, hy, blc, bs, Cond, TN, TP) %>% 
-  
-  # create into shapefile
-  st_as_sf(coords = c("longitude", "latitude"), 
-            crs = 4326) %>%   # geographic wgs84
+  mutate(
+    strcls = factor(
+      strcls,
+      levels = c("likely unconstrained", "possibly unconstrained", "possibly constrained", "likely constrained"))) %>%
+  filter(!is.na(ASCI) & !is.na(CSCI)) %>%
+  sf::st_as_sf(coords = c("longitude", "latitude"), crs = 4326)  %>%   # geographic wgs84
   # spatial join with other shapefiles for added info like county, watershed name, regional board
-  st_intersection(cntys) %>% 
-  st_intersection(sheds) %>% 
-  st_intersection(rwqbs) %>% 
-  
-  # have to define unique sample, don't want multiple rows per masterid/year
-  arrange(desc(csci_sampledate)) %>% 
-  distinct(MasterID, yr, .keep_all = TRUE) %>% 
-  
-  # now run through SQI function to calculate various SQI metrics
+  sf::st_intersection(cntys) %>%
+  sf::st_intersection(sheds) %>%
+  sf::st_intersection(rwqbs) %>%
+  arrange(desc(csci_sampledate)) %>%
+  distinct(MasterID, yr, .keep_all = TRUE)
 
-  sqi()
-  
+# Run it through SQI function
+sqi_dat_final <- sqi_dat %>% SQI::sqi()
+
+# Update StreamHealthIndex based on conditions
+sqi_dat_final <- sqi_dat_final %>%
+  mutate(
+    StreamHealthIndex = case_when(
+      StreamHealthIndex == "Healthy and unstressed" & missing_habitat == "YES" & missing_chemistry == "NO" ~ "Healthy and potentially unstressed",
+      StreamHealthIndex == "Healthy and unstressed" & missing_habitat == "NO" & missing_chemistry == "YES" ~ "Healthy and potentially unstressed",
+      StreamHealthIndex == "Healthy and unstressed" & missing_habitat == "YES" & missing_chemistry == "YES" ~ "Healthy, uncertain stress",
+      StreamHealthIndex == "Healthy and resilient" & missing_habitat == "YES" & missing_chemistry == "NO" ~ "Healthy and potentially unstressed",
+      StreamHealthIndex == "Healthy and resilient" & missing_habitat == "NO" & missing_chemistry == "YES" ~ "Healthy and potentially unstressed",
+      StreamHealthIndex == "Healthy and resilient" & missing_habitat == "YES" & missing_chemistry == "YES" ~ "Healthy, uncertain stress",
+      StreamHealthIndex == "Impacted and stressed" & missing_habitat == "YES" & missing_chemistry == "YES" ~ "Impacted by unknown stress",
+      TRUE ~ StreamHealthIndex  # Retain the original value if no conditions are met
+    )
+  )
+
+# Update OverallStressCondition_detail based on conditions
+sqi_dat_final <- sqi_dat_final %>%
+  mutate(
+    OverallStressCondition_detail = case_when(
+      missing_chemistry == "YES" & missing_habitat == "NO" & OverallStressCondition_detail == "Low stress" ~ "Low stress from habitat; water chemistry not assessed",
+      missing_chemistry == "YES" & missing_habitat == "NO" & OverallStressCondition_detail == "Stressed by chemistry degradation" ~ "Low stress from habitat; water chemistry not assessed",
+      missing_chemistry == "YES" & missing_habitat == "NO" & OverallStressCondition_detail == "Stressed by habitat degradation" ~ "Stressed by habitat degradation; water chemistry not assessed",
+      missing_chemistry == "YES" & missing_habitat == "NO" & OverallStressCondition_detail == "Stressed by chemistry and habitat degradation" ~ "Stressed by habitat degradation; water chemistry not assessed",
+      
+      missing_chemistry == "NO" & missing_habitat == "YES" & OverallStressCondition_detail == "Low stress" ~ "Low stress from water chemistry; habitat not assessed",
+      missing_chemistry == "NO" & missing_habitat == "YES" & OverallStressCondition_detail == "Stressed by chemistry degradation" ~ "Stressed by chemistry degradation; habitat not assessed",
+      missing_chemistry == "NO" & missing_habitat == "YES" & OverallStressCondition_detail == "Stressed by habitat degradation" ~ "Low stress from water chemistry; habitat not assessed",
+      missing_chemistry == "NO" & missing_habitat == "YES" & OverallStressCondition_detail == "Stressed by chemistry and habitat degradation" ~ "Stressed by water chemistry degradation; habitat not assessed",
+      
+      missing_chemistry == "YES" & missing_habitat == "YES" ~ "Stress not assessed",
+      
+      TRUE ~ OverallStressCondition_detail  # Retain the original value if no conditions are met
+    )
+  )
+
+
+sqidat_fordash <- sqi_dat_final %>%
+  group_by(MasterID) %>%
+  filter(all(data_complete == 'YES')) %>%
+  ungroup()
+
 # export
-# save(sqidat_fordash, file = 'data/sqidat_fordash.RData', compress = 'xz')
-
-
-# exploring differences between new dataset and previous version (data/sqidat.RData)
-
-# 
-# dat_explore <- sqidat_fordash %>%
-#   select(MasterID, yr, csci_sampledate, CSCI) %>%
-#   rename(csci_sampledate_new = csci_sampledate, CSCI_new = CSCI) %>%
-#   full_join(sqidat %>% as.data.frame() %>% select(MasterID, yr, CSCI)) 
-# 
-# write_csv(dat_explore, "C:/Downloads/sqi_explore.csv")
-
+save(sqidat_fordash, file = 'data/sqidat_fordash.RData', compress = 'xz')

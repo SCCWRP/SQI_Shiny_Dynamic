@@ -70,6 +70,9 @@ source(here('R', 'sqi_dat_prep.R'))
 # rename to sqidat to simplify
 sqidat <- sqidat_fordash
 
+print("look")
+print(sqidat$MasterID)
+
 # numeric variable names
 numnms <- c('CSCI', 'ASCI', 'TN', 'TP', 'Cond', 'indexscore_cram', 'IPI', 'blc', 'bs', 'ps', 'hy', 'PCT_SAFN', 'H_AqHab', 'H_SubNat',  'Ev_FlowHab', 'XCMG')
 numlab <- c('CSCI', 'ASCI', 'Total nitrogen', 'Total phosphorus', 'Conductivity', 'CRAM index score', 'Index of physical integrity', 'Buffer and landscape', 'Biotic structure', 'Physical structure', 'Hydrologic condition', '% sands and fines', 'Diversity of habitat', 'Diversity of substrate', 'Evenness of flow habitat', 'Riparian veg. cover')
@@ -105,15 +108,15 @@ allcol <- getdsccol(palout = T)
 gauge_col <- c('#a9d70b', '#f9c802', '#ff0000')
 
 # round sqidat variables so gauge colors match relative plot colors
-sqidat <- sqidat %>% 
-  gather('var', 'val', ASCI, blc, bs, Cond, CSCI, Ev_FlowHab, H_AqHab, H_SubNat, hy, indexscore_cram, IPI, PCT_SAFN, ps, TN, TP, XCMG) %>% 
-  mutate(
-    val = case_when(
-      var %in% c('Cond', 'indexscore_cram', 'blc', 'bs', 'hy', 'ps') ~ round(val, 1), 
-      var %in% c('ASCI', 'CSCI', 'Ev_FlowHab', 'H_AqHab', 'H_SubNat', 'IPI', 'PCT_SAFN', 'TN', 'TP', 'XCMG') ~ round(val, 2)
-      )
-    ) %>% 
-  spread(var, val)
+# sqidat <- sqidat %>% 
+#   gather('var', 'val', ASCI, blc, bs, Cond, CSCI, Ev_FlowHab, H_AqHab, H_SubNat, hy, indexscore_cram, IPI, PCT_SAFN, ps, TN, TP, XCMG) %>% 
+#   mutate(
+#     val = case_when(
+#       var %in% c('Cond', 'indexscore_cram', 'blc', 'bs', 'hy', 'ps') ~ round(val, 1), 
+#       var %in% c('ASCI', 'CSCI', 'Ev_FlowHab', 'H_AqHab', 'H_SubNat', 'IPI', 'PCT_SAFN', 'TN', 'TP', 'XCMG') ~ round(val, 2)
+#       )
+#     ) %>% 
+#   spread(var, val)
   
 ```
 
@@ -206,7 +209,8 @@ polys <- reactive({
 
 # filter site data by spatial 
 sitedat <- reactive({
-  
+  print("look")
+  print(length(unique(sqidat$MasterID)))
   # input
   flts <- input$flts
   flby <- input$flby
