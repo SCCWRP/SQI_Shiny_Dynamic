@@ -205,8 +205,7 @@ polys <- reactive({
 
 # filter site data by spatial 
 sitedat <- reactive({
-  print("look")
-  print(length(unique(sqidat$MasterID)))
+  
   # input
   flts <- input$flts
   flby <- input$flby
@@ -391,6 +390,7 @@ dstipi <- reactive({
 ```{r outputobj}
 
 output$num_displayed_points_on_map <- renderText({
+  
   # Separate the data based on the missing values
   sitedat <- sitedat()
   
@@ -410,6 +410,7 @@ output$num_displayed_points_on_map <- renderText({
   
   # Display both counts
   glue("Number of sites with complete data: {complete_data_count}\nNumber of sites with missing chemistry or missing habitat data: {missing_data_count}")
+  
 })
 
 
@@ -625,90 +626,34 @@ observeEvent(input$map_marker_click, {
 # })
 
 
-# observeEvent(input$map_marker_click, {
-#   # inputs
-#   tomap <- input$tomap
-#   sitedat <- sitedat()
-#   
-#   # colors
-#   cols <- getdsccol(sitedat[[tomap]])
-#   names(cols) <- NULL
-#   names(sitedat)[names(sitedat) %in% tomap] <- 'toshw'
-#   
-#   # Filter groups based on selection to reapply styling
-#   sitedat_group1 <- sitedat %>% 
-#     filter(missing_chemistry == 'NO', missing_habitat == 'NO')
-#   sitedat_group2 <- sitedat %>% 
-#     filter(!(missing_chemistry == 'NO' & missing_habitat == 'NO'))
-#   
-#   # Filter for selected site
-#   selsitplo <- sitedat %>% filter(MasterID == selsit)
-#   selsitplocol <- getdsccol(selsitplo[['toshw']])
-#   names(selsitplocol) <- NULL
-#   
-#   # Clear markers and reapply styles for all markers, including selected one
-#   # map <- map %>%
-#   #   clearMarkers() %>%
-#   #   
-#   #   # Group 1 markers
-#   #   addCircleMarkers(
-#   #     data = sitedat_group1, 
-#   #     layerId = ~MasterID,
-#   #     stroke = TRUE,
-#   #     color = 'black',
-#   #     fill = TRUE,
-#   #     fillColor = cols,
-#   #     radius = 5, 
-#   #     weight = 1,
-#   #     fillOpacity = 1,
-#   #     label = ~paste0(MasterID, ' (', yr, '): ', toshw)
-#   #   ) %>%
-#   #   
-#   #   # Group 2 markers
-#   #   addAwesomeMarkers(
-#   #     data = sitedat_group2, 
-#   #     layerId = ~MasterID,
-#   #     icon = missing_icons(),
-#   #     label = ~paste0(MasterID, ' (', yr, '): ', toshw)
-#   #   ) 
-#   # %>%
-#   #   
-#   #   # Highlight the selected marker
-#   #   addCircleMarkers(
-#   #     data = selsitplo, 
-#   #     layerId = ~MasterID,
-#   #     stroke = TRUE,
-#   #     color = 'black',
-#   #     fillColor = selsitplocol,
-#   #     fill = TRUE,
-#   #     radius = 10, 
-#   #     weight = 6,
-#   #     fillOpacity = 1,
-#   #     label = ~paste0(MasterID, ' (', yr, '): ', toshw)
-#   #   )
-# })
 
 
 
 ##
 # SQI descriptor outputs
 output$overall <- flexdashboard::renderValueBox({
+  
   req(nrow(cats()) > 0)
   txtin <- cats()$StreamHealthIndex
   colin <- getdsccol(txtin)
   colin <- ifelse(is.na(colin), "gray", colin)
   flexdashboard::valueBox(tags$p(txtin, style = "font-size: 60%"), icon = 'glyphicon-plus', color = colin)
-  })
+
+})
 
 
 output$biolcon <- flexdashboard::renderValueBox({
+  
   req(nrow(cats()) > 0)
   txtin <- cats()$BiologicalCondition
   colin <- getdsccol(txtin)
   colin <- ifelse(is.na(colin), "gray", colin)
   flexdashboard::valueBox(tags$p(txtin, style = "font-size: 60%"), icon = 'glyphicon-leaf', color = colin)
-  })
+
+})
+
 output$strsdet <- flexdashboard::renderValueBox({
+  
   req(nrow(cats()) > 0)
   txtin <- cats()$OverallStressCondition_detail
   colin <- getdsccol(txtin)
@@ -716,7 +661,7 @@ output$strsdet <- flexdashboard::renderValueBox({
   colin <- ifelse(is.na(colin), "gray", colin)
   flexdashboard::valueBox(tags$p(txtin, style = "font-size: 60%"), icon = 'glyphicon-flash', color = colin)
   
-  })
+})
 
 ##
 # probability gauge outputs
@@ -729,6 +674,7 @@ output$pchemhab <- renderGauge({
     ))
              
   })
+
 output$pchem <- renderGauge({
   
   val <- round(100 * cats()$pChem, 1)
@@ -738,6 +684,7 @@ output$pchem <- renderGauge({
   ))
   
 })
+
 output$phab <- renderGauge({
   val <- round(100 * cats()$pHab, 1)
   gauge(val, min = 0, max = 100, symbol = '%', gaugeSectors(
@@ -956,7 +903,9 @@ generate_pdf_report <- function(file) {
   
     # data
     tmp_dat <- sitedat() %>% 
-      filter(data_complete == 'YES') %>%
+      group_by(MasterID) %>%
+      filter(all(data_complete == 'YES')) %>%
+      ungroup() %>%
       rename(
       biological_condition = BiologicalCondition,
       stress_condition = OverallStressCondition_detail,
@@ -1060,7 +1009,7 @@ generate_pdf_report <- function(file) {
     next_y_pos <- y_pos_start - 0.02  # Additional space before the next section
     
     # Subsequent text, starting from the calculated position
-    text(left_margin, next_y_pos, paste(unique_sites_num, "sites and", unique_sample_num, "samples evaluated."), adj = 0, cex = 0.8)
+    text(left_margin, next_y_pos, paste(unique_sites_num, "sites with complete data for all years and", unique_sample_num, "samples evaluated."), adj = 0, cex = 0.8)
     next_y_pos <- next_y_pos - line_height
     text(left_margin, next_y_pos, paste("Data spans from", initial_year, "to", final_year, "."), adj = 0, cex = 0.8)
     
