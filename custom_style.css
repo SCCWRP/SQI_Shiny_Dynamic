@@ -1,0 +1,8 @@
+#section-sidebar {
+  width: 100px; /* Default width */
+  resize: horizontal; /* Allows sidebar resizing */
+  overflow: auto; /* Prevents content overflow */
+}
+.main-container {
+  margin-left: 720px; /* Adjust based on sidebar width */
+}

@@ -2,10 +2,12 @@
 title: "SQI dashboard v3"
 output:
   flexdashboard::flex_dashboard:
+    css: custom_style.css
     includes:
       in_header: cssloaders_in_header.html
 runtime: shiny
 resource_files:
+- custom_style.css
 - R/dat_proc.R
 - R/funcs.R
 - R/sqi_dat_prep.R
@@ -25,6 +27,16 @@ resource_files:
 #map {
   height: calc(100vh - 235px) !important;
 } 
+
+.sidebar {
+  width: 100px; /* Default width */
+  resize: horizontal; /* Allows sidebar resizing */
+  overflow: auto; /* Prevents content overflow */
+}
+.main-container {
+  margin-left: 720px; /* Adjust based on sidebar width */
+}
+
 </style>
 
 ```{r global, include = FALSE, message = F, warning = F}
@@ -389,29 +401,37 @@ dstipi <- reactive({
 
 ```{r outputobj}
 
-output$num_displayed_points_on_map <- renderText({
+output$num_displayed_points_on_map <- renderUI({
   
   # Separate the data based on the missing values
   sitedat <- sitedat()
   
   # Count unique MasterID for complete and missing data
-  complete_data <- sitedat %>% 
-    group_by(MasterID) %>%
-    filter(all(data_complete == 'YES')) %>%
-    ungroup()
+  yes_data <- sitedat %>%
+    filter(data_complete == 'YES') %>%
+    distinct(MasterID, yr)
   
-  complete_data_count <- length(unique(complete_data$MasterID))
+  yes_data_count_pairs <- nrow(yes_data)               # Count of unique (MasterID, yr) pairs
+  yes_data_count_masterid <- n_distinct(yes_data$MasterID) # Count of unique MasterID
   
-  missing_data <- sitedat %>% 
-    group_by(MasterID) %>%
-    filter(any(data_complete == 'NO')) %>%
-    ungroup()
-  missing_data_count <- length(unique(missing_data$MasterID))
+  # For 'NO' cases
+  no_data <- sitedat %>%
+    filter(data_complete == 'NO') %>%
+    distinct(MasterID, yr)
   
-  # Display both counts
-  glue("Number of sites with complete data: {complete_data_count}\nNumber of sites with missing chemistry or missing habitat data: {missing_data_count}")
+  no_data_count_pairs <- nrow(no_data)                 # Count of unique (MasterID, yr) pairs
+  no_data_count_masterid <- n_distinct(no_data$MasterID)   # Count of unique MasterID
+  
+  total_pairs <- yes_data_count_pairs + no_data_count_pairs
+  num_unique_masterid <- n_distinct(sitedat$MasterID)
+    
+  # Display both counts with HTML line breaks
+  HTML(glue("Number of site-visits with complete data: {yes_data_count_pairs} ({yes_data_count_masterid} unique sites)<br>
+             Number of site-visits with incomplete data: {no_data_count_pairs} ({no_data_count_masterid} unique sites)<br>
+             Total number of site-visits: {total_pairs} ({num_unique_masterid} unique sites)"))
   
 })
+
 
 
 output$map <- renderLeaflet({
@@ -1161,7 +1181,7 @@ column(width = 12,
       ), 
       selected = 'Overall'
     ),
-    textOutput("num_displayed_points_on_map"),
+    uiOutput("num_displayed_points_on_map"),
     checkboxInput("show_missing_data", "Include sites with missing data", value = TRUE)
   
   ),
