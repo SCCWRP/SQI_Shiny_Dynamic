@@ -205,7 +205,8 @@ polys <- reactive({
 
 # filter site data by spatial 
 sitedat <- reactive({
-  
+  print("look")
+  print(length(unique(sqidat$MasterID)))
   # input
   flts <- input$flts
   flby <- input$flby
@@ -399,13 +400,13 @@ output$num_displayed_points_on_map <- renderText({
     filter(all(data_complete == 'YES')) %>%
     ungroup()
   
-  complete_data_count <- nrow(complete_data)
+  complete_data_count <- length(unique(complete_data$MasterID))
   
   missing_data <- sitedat %>% 
     group_by(MasterID) %>%
     filter(any(data_complete == 'NO')) %>%
     ungroup()
-  missing_data_count <- nrow(missing_data)
+  missing_data_count <- length(unique(missing_data$MasterID))
   
   # Display both counts
   glue("Number of sites with complete data: {complete_data_count}\nNumber of sites with missing chemistry or missing habitat data: {missing_data_count}")
